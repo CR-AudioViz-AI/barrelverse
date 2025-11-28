@@ -1,8 +1,9 @@
 // app/games/page.tsx
 // BarrelVerse Games Page - REAL Database Integration
 
-'use client'
+export const dynamic = 'force-dynamic'
 
+'use client'
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { useTrivia, CATEGORY_INFO, DIFFICULTY_INFO } from '@/lib/hooks/use-trivia'
