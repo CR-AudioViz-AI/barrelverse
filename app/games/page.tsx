@@ -1,9 +1,10 @@
+'use client'
+
 // app/games/page.tsx
 // BarrelVerse Games Page - REAL Database Integration
 
 export const dynamic = 'force-dynamic'
 
-'use client'
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { useTrivia, CATEGORY_INFO, DIFFICULTY_INFO } from '@/lib/hooks/use-trivia'
@@ -18,484 +19,414 @@ const GAME_MODES = [
     description: '10 random questions across all categories',
     icon: '⚡',
     questionCount: 10,
-    color: 'from-amber-500 to-orange-600',
+    timeLimit: 30,
+    multiplier: 1,
   },
   {
-    id: 'masters_challenge',
-    name: "Master's Challenge",
-    description: '20 expert-level questions for true connoisseurs',
-    icon: '👑',
-    questionCount: 20,
-    difficulty: 'expert' as Difficulty,
-    color: 'from-purple-500 to-pink-600',
+    id: 'master_distiller',
+    name: 'Master Distiller',
+    description: '25 challenging questions for experts',
+    icon: '🏆',
+    questionCount: 25,
+    timeLimit: 20,
+    multiplier: 2,
   },
   {
-    id: 'daily_dram',
-    name: 'Daily Dram',
-    description: 'New questions every day with bonus $PROOF',
-    icon: '📅',
-    questionCount: 5,
-    color: 'from-green-500 to-teal-600',
-  },
-  {
-    id: 'speed_round',
-    name: 'Speed Round',
-    description: 'Answer as fast as you can - 15 seconds per question',
-    icon: '⏱️',
+    id: 'category_deep_dive',
+    name: 'Category Deep Dive',
+    description: 'Focus on one category of your choice',
+    icon: '🎯',
     questionCount: 15,
-    color: 'from-red-500 to-rose-600',
+    timeLimit: 25,
+    multiplier: 1.5,
+  },
+  {
+    id: 'tasting_notes',
+    name: 'Tasting Notes Challenge',
+    description: 'Identify spirits by their flavor profiles',
+    icon: '👃',
+    questionCount: 10,
+    timeLimit: 45,
+    multiplier: 1.5,
   },
 ]
 
 export default function GamesPage() {
-  const { user, profile, isAuthenticated } = useAuth()
-  const trivia = useTrivia()
-  
-  const [view, setView] = useState<'menu' | 'category' | 'playing' | 'results'>('menu')
-  const [selectedCategory, setSelectedCategory] = useState<TriviaCategory | null>(null)
-  const [selectedDifficulty, setSelectedDifficulty] = useState<Difficulty | null>(null)
-  const [selectedMode, setSelectedMode] = useState<typeof GAME_MODES[0] | null>(null)
-  const [selectedAnswer, setSelectedAnswer] = useState<string | null>(null)
-  const [showExplanation, setShowExplanation] = useState(false)
-  const [lastResult, setLastResult] = useState<{
-    isCorrect: boolean
-    correctAnswer: string
-    explanation: string | null
-    proofEarned: number
-  } | null>(null)
-  const [timeRemaining, setTimeRemaining] = useState<number | null>(null)
-  const [startTime, setStartTime] = useState<number>(0)
+  const { user, profile, loading: authLoading } = useAuth()
+  const {
+    questions,
+    currentQuestion,
+    score,
+    streak,
+    isPlaying,
+    loading: triviaLoading,
+    error,
+    startGame,
+    submitAnswer,
+    endGame,
+    getProofEarned,
+  } = useTrivia()
 
-  // Timer for speed round
+  const [selectedMode, setSelectedMode] = useState<string | null>(null)
+  const [selectedCategory, setSelectedCategory] = useState<TriviaCategory | 'all'>('all')
+  const [selectedDifficulty, setSelectedDifficulty] = useState<Difficulty>('medium')
+  const [selectedAnswer, setSelectedAnswer] = useState<string | null>(null)
+  const [showResult, setShowResult] = useState(false)
+  const [timeRemaining, setTimeRemaining] = useState(30)
+  const [questionIndex, setQuestionIndex] = useState(0)
+
+  // Timer effect
   useEffect(() => {
-    if (view !== 'playing' || selectedMode?.id !== 'speed_round') return
-    
-    setTimeRemaining(15)
+    if (!isPlaying || showResult) return
+
     const timer = setInterval(() => {
-      setTimeRemaining(prev => {
-        if (prev === null || prev <= 1) {
-          handleTimeUp()
-          return null
+      setTimeRemaining((prev) => {
+        if (prev <= 1) {
+          handleTimeout()
+          return 0
         }
         return prev - 1
       })
     }, 1000)
 
     return () => clearInterval(timer)
-  }, [view, trivia.currentIndex, selectedMode])
+  }, [isPlaying, showResult, currentQuestion])
 
-  const handleTimeUp = () => {
-    if (trivia.currentQuestion) {
-      handleAnswerSubmit(trivia.currentQuestion.correct_answer, true)
-    }
+  const handleStartGame = async () => {
+    if (!selectedMode) return
+
+    const mode = GAME_MODES.find((m) => m.id === selectedMode)
+    if (!mode) return
+
+    const category = selectedMode === 'category_deep_dive' && selectedCategory !== 'all'
+      ? selectedCategory
+      : undefined
+
+    await startGame(mode.questionCount, category, selectedDifficulty)
+    setQuestionIndex(0)
+    setTimeRemaining(mode.timeLimit)
+    setSelectedAnswer(null)
+    setShowResult(false)
   }
 
-  // Start a game with selected mode
-  const startGame = async (mode: typeof GAME_MODES[0], category?: TriviaCategory, difficulty?: Difficulty) => {
-    setSelectedMode(mode)
-    setSelectedCategory(category || null)
-    setSelectedDifficulty(difficulty || mode.difficulty || null)
-    
-    const result = await trivia.startGame(
-      mode.id as 'quick_pour' | 'masters_challenge' | 'daily_dram' | 'blind_tasting' | 'speed_round',
-      category,
-      difficulty || mode.difficulty,
-      mode.questionCount
-    )
+  const handleAnswer = async (answer: string) => {
+    if (showResult || !currentQuestion) return
 
-    if (result.success) {
-      setView('playing')
-      setStartTime(Date.now())
-    }
-  }
-
-  // Handle answer submission
-  const handleAnswerSubmit = (answer: string, timedOut: boolean = false) => {
-    if (selectedAnswer !== null) return
-    
-    const timeMs = Date.now() - startTime
     setSelectedAnswer(answer)
-    
-    const result = trivia.submitAnswer(answer, timeMs)
-    if (result) {
-      setLastResult(result)
-      setShowExplanation(true)
+    setShowResult(true)
 
-      // Auto-advance after showing result
-      setTimeout(() => {
-        if (result.isComplete) {
-          setView('results')
-          // Save game session
-          trivia.saveGameSession(user?.id)
-        } else {
-          setSelectedAnswer(null)
-          setShowExplanation(false)
-          setLastResult(null)
-          setStartTime(Date.now())
-        }
-      }, timedOut ? 1500 : 2500)
-    }
+    const correct = await submitAnswer(currentQuestion.id, answer)
+
+    // Wait briefly to show result, then move to next question
+    setTimeout(() => {
+      if (questionIndex + 1 < questions.length) {
+        setQuestionIndex((prev) => prev + 1)
+        setSelectedAnswer(null)
+        setShowResult(false)
+        const mode = GAME_MODES.find((m) => m.id === selectedMode)
+        setTimeRemaining(mode?.timeLimit || 30)
+      } else {
+        endGame()
+      }
+    }, 1500)
   }
 
-  // Render game menu
-  const renderMenu = () => (
-    <div className="max-w-6xl mx-auto p-6">
-      <div className="text-center mb-8">
-        <h1 className="text-4xl font-bold text-white mb-2">🎮 BarrelVerse Games</h1>
-        <p className="text-gray-400">Test your spirits knowledge and earn $PROOF tokens!</p>
-        {profile && (
-          <p className="text-amber-400 mt-2">
-            Your Balance: {profile.proof_balance.toLocaleString()} $PROOF
-          </p>
-        )}
-      </div>
+  const handleTimeout = () => {
+    if (!currentQuestion) return
+    handleAnswer('TIMEOUT')
+  }
 
-      {/* Game Modes */}
-      <div className="grid md:grid-cols-2 gap-6 mb-10">
-        {GAME_MODES.map(mode => (
-          <button
-            key={mode.id}
-            onClick={() => {
-              if (mode.id === 'quick_pour') {
-                startGame(mode)
-              } else if (mode.id === 'masters_challenge' || mode.id === 'speed_round') {
-                startGame(mode)
-              } else {
-                setSelectedMode(mode)
-                setView('category')
-              }
-            }}
-            className={`p-6 rounded-xl bg-gradient-to-br ${mode.color} text-white text-left transform hover:scale-105 transition-all shadow-lg`}
-          >
-            <span className="text-4xl mb-3 block">{mode.icon}</span>
-            <h3 className="text-xl font-bold mb-1">{mode.name}</h3>
-            <p className="text-sm opacity-90">{mode.description}</p>
-            <p className="text-xs mt-2 opacity-75">{mode.questionCount} questions</p>
-          </button>
-        ))}
-      </div>
+  const handleEndGame = () => {
+    endGame()
+    setSelectedMode(null)
+    setQuestionIndex(0)
+  }
 
-      {/* Category Selection */}
-      <div className="mb-8">
-        <h2 className="text-2xl font-bold text-white mb-4">🏷️ Play by Category</h2>
-        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3">
-          {(Object.keys(CATEGORY_INFO) as TriviaCategory[]).map(cat => (
-            <button
-              key={cat}
-              onClick={() => {
-                setSelectedCategory(cat)
-                setView('category')
-              }}
-              className="p-4 rounded-lg bg-gray-800 hover:bg-gray-700 transition-colors text-center"
-            >
-              <span className="text-2xl block mb-1">{CATEGORY_INFO[cat].icon}</span>
-              <span className="text-sm text-gray-300">{CATEGORY_INFO[cat].label}</span>
-            </button>
-          ))}
-        </div>
-      </div>
+  const loading = authLoading || triviaLoading
 
-      {/* Quick Stats */}
-      {profile && (
-        <div className="bg-gray-800/50 rounded-xl p-6">
-          <h3 className="text-lg font-semibold text-white mb-4">📊 Your Stats</h3>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <div className="text-center">
-              <p className="text-2xl font-bold text-amber-400">{profile.games_played}</p>
-              <p className="text-sm text-gray-400">Games Played</p>
-            </div>
-            <div className="text-center">
-              <p className="text-2xl font-bold text-green-400">{profile.correct_answers}</p>
-              <p className="text-sm text-gray-400">Correct Answers</p>
-            </div>
-            <div className="text-center">
-              <p className="text-2xl font-bold text-purple-400">
-                {profile.games_played > 0 
-                  ? Math.round((profile.correct_answers / (profile.games_played * 10)) * 100) 
-                  : 0}%
-              </p>
-              <p className="text-sm text-gray-400">Accuracy</p>
-            </div>
-            <div className="text-center">
-              <p className="text-2xl font-bold text-amber-400">{profile.total_proof_earned.toLocaleString()}</p>
-              <p className="text-sm text-gray-400">Total $PROOF Earned</p>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {!isAuthenticated && (
-        <div className="mt-8 bg-gradient-to-r from-amber-900/50 to-orange-900/50 rounded-xl p-6 text-center">
-          <p className="text-gray-300 mb-3">
-            Sign in to save your progress and earn $PROOF rewards!
-          </p>
-          <Link
-            href="/auth/login"
-            className="inline-block px-6 py-2 bg-amber-600 hover:bg-amber-700 rounded-lg text-white font-medium transition-colors"
-          >
-            Sign In
+  // Mode Selection Screen
+  if (!isPlaying && !selectedMode) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-amber-900 via-amber-800 to-stone-900 text-white">
+        <div className="container mx-auto px-4 py-8">
+          <Link href="/" className="inline-flex items-center text-amber-300 hover:text-amber-200 mb-8">
+            ← Back to Home
           </Link>
-        </div>
-      )}
-    </div>
-  )
 
-  // Render category/difficulty selection
-  const renderCategorySelection = () => (
-    <div className="max-w-4xl mx-auto p-6">
-      <button
-        onClick={() => {
-          setView('menu')
-          setSelectedCategory(null)
-          setSelectedDifficulty(null)
-          setSelectedMode(null)
-        }}
-        className="mb-6 text-gray-400 hover:text-white transition-colors"
-      >
-        ← Back to Menu
-      </button>
+          <div className="text-center mb-12">
+            <h1 className="text-4xl font-bold mb-4">🎮 Trivia Games</h1>
+            <p className="text-xl text-amber-200">Test your spirits knowledge and earn $PROOF tokens!</p>
+            {profile && (
+              <p className="text-amber-300 mt-2">
+                Your $PROOF Balance: {profile.proof_balance.toLocaleString()}
+              </p>
+            )}
+          </div>
 
-      <div className="text-center mb-8">
-        <h2 className="text-3xl font-bold text-white">
-          {selectedCategory ? CATEGORY_INFO[selectedCategory].icon : '🎯'} 
-          {' '}
-          {selectedCategory ? CATEGORY_INFO[selectedCategory].label : 'Select Category'}
-        </h2>
-      </div>
-
-      {!selectedCategory && (
-        <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-8">
-          {(Object.keys(CATEGORY_INFO) as TriviaCategory[]).slice(0, 12).map(cat => (
-            <button
-              key={cat}
-              onClick={() => setSelectedCategory(cat)}
-              className="p-6 rounded-xl bg-gray-800 hover:bg-gray-700 transition-colors text-center"
-            >
-              <span className="text-4xl block mb-2">{CATEGORY_INFO[cat].icon}</span>
-              <span className="text-white font-medium">{CATEGORY_INFO[cat].label}</span>
-            </button>
-          ))}
-        </div>
-      )}
-
-      {selectedCategory && (
-        <>
-          <p className="text-center text-gray-400 mb-6">Select Difficulty</p>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            {(Object.keys(DIFFICULTY_INFO) as Difficulty[]).map(diff => (
+          <div className="grid md:grid-cols-2 gap-6 max-w-4xl mx-auto">
+            {GAME_MODES.map((mode) => (
               <button
-                key={diff}
-                onClick={() => startGame(selectedMode || GAME_MODES[0], selectedCategory, diff)}
-                className={`p-6 rounded-xl transition-all text-center ${
-                  diff === 'easy' ? 'bg-green-600 hover:bg-green-700' :
-                  diff === 'medium' ? 'bg-yellow-600 hover:bg-yellow-700' :
-                  diff === 'hard' ? 'bg-orange-600 hover:bg-orange-700' :
-                  'bg-red-600 hover:bg-red-700'
-                }`}
+                key={mode.id}
+                onClick={() => setSelectedMode(mode.id)}
+                className="bg-stone-800/50 border border-amber-600/30 rounded-xl p-6 text-left hover:border-amber-500 hover:bg-stone-800/70 transition-all group"
               >
-                <span className="text-2xl font-bold text-white block">
-                  {DIFFICULTY_INFO[diff].label}
-                </span>
-                <span className="text-sm text-white/80">
-                  {DIFFICULTY_INFO[diff].multiplier}x $PROOF
-                </span>
+                <div className="text-4xl mb-4">{mode.icon}</div>
+                <h3 className="text-xl font-bold mb-2 group-hover:text-amber-300">{mode.name}</h3>
+                <p className="text-stone-400 mb-4">{mode.description}</p>
+                <div className="flex gap-4 text-sm text-amber-400">
+                  <span>📝 {mode.questionCount} questions</span>
+                  <span>⏱️ {mode.timeLimit}s per question</span>
+                  <span>💰 {mode.multiplier}x $PROOF</span>
+                </div>
               </button>
             ))}
           </div>
-        </>
-      )}
-    </div>
-  )
 
-  // Render game play
-  const renderPlaying = () => {
-    const question = trivia.currentQuestion
-    if (!question) return <div className="text-center p-10 text-white">Loading...</div>
+          {!user && (
+            <div className="mt-8 text-center">
+              <p className="text-amber-300 mb-4">Sign in to save your progress and earn $PROOF!</p>
+              <Link
+                href="/auth/login"
+                className="inline-block bg-amber-600 hover:bg-amber-700 px-6 py-3 rounded-lg font-semibold transition-colors"
+              >
+                Sign In
+              </Link>
+            </div>
+          )}
+        </div>
+      </div>
+    )
+  }
 
+  // Game Configuration Screen
+  if (!isPlaying && selectedMode) {
+    const mode = GAME_MODES.find((m) => m.id === selectedMode)
     return (
-      <div className="max-w-3xl mx-auto p-6">
-        {/* Header */}
-        <div className="flex justify-between items-center mb-6">
-          <div className="text-gray-400">
-            Question {question.questionNumber} of {question.totalQuestions}
-          </div>
-          <div className="flex items-center gap-4">
-            {timeRemaining !== null && (
-              <div className={`text-xl font-bold ${timeRemaining <= 5 ? 'text-red-500' : 'text-white'}`}>
-                ⏱️ {timeRemaining}s
+      <div className="min-h-screen bg-gradient-to-br from-amber-900 via-amber-800 to-stone-900 text-white">
+        <div className="container mx-auto px-4 py-8">
+          <button
+            onClick={() => setSelectedMode(null)}
+            className="inline-flex items-center text-amber-300 hover:text-amber-200 mb-8"
+          >
+            ← Choose Different Mode
+          </button>
+
+          <div className="max-w-xl mx-auto bg-stone-800/50 border border-amber-600/30 rounded-xl p-8">
+            <div className="text-center mb-8">
+              <div className="text-5xl mb-4">{mode?.icon}</div>
+              <h1 className="text-3xl font-bold mb-2">{mode?.name}</h1>
+              <p className="text-stone-400">{mode?.description}</p>
+            </div>
+
+            {selectedMode === 'category_deep_dive' && (
+              <div className="mb-6">
+                <label className="block text-amber-300 mb-2 font-semibold">Select Category</label>
+                <select
+                  value={selectedCategory}
+                  onChange={(e) => setSelectedCategory(e.target.value as TriviaCategory | 'all')}
+                  className="w-full bg-stone-900 border border-amber-600/30 rounded-lg px-4 py-3 text-white focus:border-amber-500 focus:outline-none"
+                >
+                  <option value="all">All Categories</option>
+                  {Object.entries(CATEGORY_INFO).map(([key, info]) => (
+                    <option key={key} value={key}>
+                      {info.icon} {info.name}
+                    </option>
+                  ))}
+                </select>
               </div>
             )}
-            <div className="text-amber-400 font-medium">
-              💰 {trivia.proofEarned} $PROOF
+
+            <div className="mb-8">
+              <label className="block text-amber-300 mb-2 font-semibold">Difficulty</label>
+              <div className="grid grid-cols-3 gap-3">
+                {Object.entries(DIFFICULTY_INFO).map(([key, info]) => (
+                  <button
+                    key={key}
+                    onClick={() => setSelectedDifficulty(key as Difficulty)}
+                    className={`px-4 py-3 rounded-lg border transition-all ${
+                      selectedDifficulty === key
+                        ? 'bg-amber-600 border-amber-500 text-white'
+                        : 'bg-stone-900 border-stone-700 text-stone-300 hover:border-amber-600/50'
+                    }`}
+                  >
+                    <div className="font-semibold">{info.name}</div>
+                    <div className="text-xs opacity-75">{info.multiplier}x $PROOF</div>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <button
+              onClick={handleStartGame}
+              disabled={loading}
+              className="w-full bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-white font-bold py-4 px-8 rounded-lg text-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {loading ? 'Loading...' : '🎮 Start Game'}
+            </button>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  // Active Game Screen
+  const mode = GAME_MODES.find((m) => m.id === selectedMode)
+  const progress = ((questionIndex + 1) / questions.length) * 100
+
+  if (!currentQuestion) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-amber-900 via-amber-800 to-stone-900 text-white flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin text-5xl mb-4">🥃</div>
+          <p className="text-xl">Loading questions...</p>
+        </div>
+      </div>
+    )
+  }
+
+  // Game Results Screen (when game ends)
+  if (!isPlaying && questionIndex > 0) {
+    const proofEarned = getProofEarned()
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-amber-900 via-amber-800 to-stone-900 text-white">
+        <div className="container mx-auto px-4 py-8">
+          <div className="max-w-xl mx-auto bg-stone-800/50 border border-amber-600/30 rounded-xl p-8 text-center">
+            <div className="text-6xl mb-6">🎉</div>
+            <h1 className="text-3xl font-bold mb-4">Game Complete!</h1>
+            
+            <div className="grid grid-cols-2 gap-4 mb-8">
+              <div className="bg-stone-900/50 rounded-lg p-4">
+                <div className="text-3xl font-bold text-amber-400">{score}</div>
+                <div className="text-stone-400">Correct Answers</div>
+              </div>
+              <div className="bg-stone-900/50 rounded-lg p-4">
+                <div className="text-3xl font-bold text-amber-400">{streak}</div>
+                <div className="text-stone-400">Best Streak</div>
+              </div>
+              <div className="bg-stone-900/50 rounded-lg p-4 col-span-2">
+                <div className="text-4xl font-bold text-green-400">+{proofEarned}</div>
+                <div className="text-stone-400">$PROOF Earned</div>
+              </div>
+            </div>
+
+            <div className="flex gap-4">
+              <button
+                onClick={handleStartGame}
+                className="flex-1 bg-amber-600 hover:bg-amber-700 py-3 px-6 rounded-lg font-semibold transition-colors"
+              >
+                Play Again
+              </button>
+              <button
+                onClick={handleEndGame}
+                className="flex-1 bg-stone-700 hover:bg-stone-600 py-3 px-6 rounded-lg font-semibold transition-colors"
+              >
+                Choose Mode
+              </button>
             </div>
           </div>
         </div>
+      </div>
+    )
+  }
 
-        {/* Progress bar */}
-        <div className="w-full bg-gray-700 rounded-full h-2 mb-8">
+  // Question Screen
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-amber-900 via-amber-800 to-stone-900 text-white">
+      <div className="container mx-auto px-4 py-8">
+        {/* Header */}
+        <div className="flex justify-between items-center mb-6">
+          <div className="flex items-center gap-4">
+            <span className="text-amber-300">
+              Question {questionIndex + 1}/{questions.length}
+            </span>
+            <span className="bg-stone-800 px-3 py-1 rounded-full text-sm">
+              {CATEGORY_INFO[currentQuestion.category]?.icon} {CATEGORY_INFO[currentQuestion.category]?.name}
+            </span>
+          </div>
+          <button
+            onClick={handleEndGame}
+            className="text-stone-400 hover:text-white transition-colors"
+          >
+            End Game
+          </button>
+        </div>
+
+        {/* Progress Bar */}
+        <div className="w-full h-2 bg-stone-800 rounded-full mb-8">
           <div
-            className="bg-amber-500 h-2 rounded-full transition-all duration-300"
-            style={{ width: `${trivia.progress.percentage}%` }}
+            className="h-full bg-gradient-to-r from-amber-500 to-amber-400 rounded-full transition-all"
+            style={{ width: `${progress}%` }}
           />
         </div>
 
-        {/* Category & Difficulty badge */}
-        <div className="flex gap-2 mb-4">
-          <span className="px-3 py-1 bg-gray-700 rounded-full text-sm text-gray-300">
-            {CATEGORY_INFO[question.category as TriviaCategory]?.icon} {CATEGORY_INFO[question.category as TriviaCategory]?.label}
-          </span>
-          <span className={`px-3 py-1 rounded-full text-sm ${
-            question.difficulty === 'easy' ? 'bg-green-600/50 text-green-300' :
-            question.difficulty === 'medium' ? 'bg-yellow-600/50 text-yellow-300' :
-            question.difficulty === 'hard' ? 'bg-orange-600/50 text-orange-300' :
-            'bg-red-600/50 text-red-300'
-          }`}>
-            {DIFFICULTY_INFO[question.difficulty as Difficulty]?.label}
-          </span>
-        </div>
-
-        {/* Question */}
-        <div className="bg-gray-800 rounded-xl p-6 mb-6">
-          <h2 className="text-xl md:text-2xl font-medium text-white leading-relaxed">
-            {question.question}
-          </h2>
-        </div>
-
-        {/* Answers */}
-        <div className="space-y-3">
-          {question.shuffledAnswers.map((answer, index) => {
-            const isSelected = selectedAnswer === answer
-            const isCorrect = answer === question.correct_answer
-            const showResult = showExplanation
-
-            let buttonClass = 'w-full p-4 rounded-xl text-left transition-all '
-            if (showResult) {
-              if (isCorrect) {
-                buttonClass += 'bg-green-600 text-white'
-              } else if (isSelected && !isCorrect) {
-                buttonClass += 'bg-red-600 text-white'
-              } else {
-                buttonClass += 'bg-gray-700 text-gray-400'
-              }
-            } else {
-              buttonClass += 'bg-gray-700 hover:bg-gray-600 text-white'
-            }
-
-            return (
-              <button
-                key={index}
-                onClick={() => handleAnswerSubmit(answer)}
-                disabled={selectedAnswer !== null}
-                className={buttonClass}
-              >
-                <span className="mr-3 font-bold text-lg">
-                  {String.fromCharCode(65 + index)}
-                </span>
-                {answer}
-                {showResult && isCorrect && <span className="float-right">✓</span>}
-                {showResult && isSelected && !isCorrect && <span className="float-right">✗</span>}
-              </button>
-            )
-          })}
-        </div>
-
-        {/* Explanation */}
-        {showExplanation && lastResult && (
-          <div className={`mt-6 p-4 rounded-xl ${lastResult.isCorrect ? 'bg-green-900/50' : 'bg-red-900/50'}`}>
-            <p className={`font-medium ${lastResult.isCorrect ? 'text-green-400' : 'text-red-400'}`}>
-              {lastResult.isCorrect ? '🎉 Correct!' : '❌ Incorrect'}
-              {lastResult.proofEarned > 0 && ` +${lastResult.proofEarned} $PROOF`}
-            </p>
-            {lastResult.explanation && (
-              <p className="text-gray-300 mt-2 text-sm">{lastResult.explanation}</p>
-            )}
+        {/* Stats Row */}
+        <div className="flex justify-center gap-8 mb-8">
+          <div className="text-center">
+            <div className="text-2xl font-bold text-amber-400">{score}</div>
+            <div className="text-stone-400 text-sm">Score</div>
           </div>
-        )}
-      </div>
-    )
-  }
-
-  // Render results
-  const renderResults = () => {
-    const stats = trivia.getGameStats()
-    
-    return (
-      <div className="max-w-2xl mx-auto p-6 text-center">
-        <div className="mb-8">
-          <span className="text-6xl mb-4 block">
-            {stats.accuracy >= 80 ? '🏆' : stats.accuracy >= 60 ? '🎉' : stats.accuracy >= 40 ? '👍' : '📚'}
-          </span>
-          <h2 className="text-3xl font-bold text-white mb-2">
-            {stats.accuracy >= 80 ? 'Outstanding!' : 
-             stats.accuracy >= 60 ? 'Great Job!' : 
-             stats.accuracy >= 40 ? 'Good Effort!' : 
-             'Keep Learning!'}
-          </h2>
-        </div>
-
-        <div className="bg-gray-800 rounded-xl p-6 mb-8">
-          <div className="grid grid-cols-2 gap-6">
-            <div>
-              <p className="text-4xl font-bold text-white">{stats.score}/{stats.total}</p>
-              <p className="text-gray-400">Correct Answers</p>
+          <div className="text-center">
+            <div className="text-2xl font-bold text-orange-400">{streak}🔥</div>
+            <div className="text-stone-400 text-sm">Streak</div>
+          </div>
+          <div className="text-center">
+            <div className={`text-2xl font-bold ${timeRemaining <= 10 ? 'text-red-400 animate-pulse' : 'text-white'}`}>
+              {timeRemaining}s
             </div>
-            <div>
-              <p className="text-4xl font-bold text-green-400">{stats.accuracy}%</p>
-              <p className="text-gray-400">Accuracy</p>
-            </div>
-            <div>
-              <p className="text-4xl font-bold text-amber-400">{stats.proofEarned}</p>
-              <p className="text-gray-400">$PROOF Earned</p>
-            </div>
-            <div>
-              <p className="text-4xl font-bold text-blue-400">
-                {Math.round(stats.averageTimeMs / 1000)}s
-              </p>
-              <p className="text-gray-400">Avg Time</p>
-            </div>
+            <div className="text-stone-400 text-sm">Time</div>
           </div>
         </div>
 
-        <div className="flex gap-4 justify-center">
-          <button
-            onClick={() => {
-              trivia.resetGame()
-              setView('menu')
-              setSelectedAnswer(null)
-              setShowExplanation(false)
-              setLastResult(null)
-            }}
-            className="px-6 py-3 bg-gray-700 hover:bg-gray-600 rounded-xl text-white font-medium transition-colors"
-          >
-            Back to Menu
-          </button>
-          <button
-            onClick={() => {
-              trivia.resetGame()
-              if (selectedMode) {
-                startGame(selectedMode, selectedCategory || undefined, selectedDifficulty || undefined)
-              } else {
-                setView('menu')
-              }
-              setSelectedAnswer(null)
-              setShowExplanation(false)
-              setLastResult(null)
-            }}
-            className="px-6 py-3 bg-amber-600 hover:bg-amber-700 rounded-xl text-white font-medium transition-colors"
-          >
-            Play Again
-          </button>
+        {/* Question Card */}
+        <div className="max-w-2xl mx-auto">
+          <div className="bg-stone-800/50 border border-amber-600/30 rounded-xl p-8 mb-6">
+            <div className="flex justify-between items-start mb-4">
+              <span className={`px-3 py-1 rounded-full text-sm ${
+                currentQuestion.difficulty === 'easy' ? 'bg-green-600/30 text-green-300' :
+                currentQuestion.difficulty === 'medium' ? 'bg-amber-600/30 text-amber-300' :
+                'bg-red-600/30 text-red-300'
+              }`}>
+                {DIFFICULTY_INFO[currentQuestion.difficulty]?.name}
+              </span>
+              <span className="text-amber-400 text-sm">
+                +{currentQuestion.points * (mode?.multiplier || 1)} $PROOF
+              </span>
+            </div>
+            <h2 className="text-xl font-semibold">{currentQuestion.question}</h2>
+          </div>
+
+          {/* Answer Options */}
+          <div className="grid gap-3">
+            {currentQuestion.options.map((option, index) => {
+              const isSelected = selectedAnswer === option
+              const isCorrect = option === currentQuestion.correct_answer
+              const showCorrect = showResult && isCorrect
+              const showWrong = showResult && isSelected && !isCorrect
+
+              return (
+                <button
+                  key={index}
+                  onClick={() => handleAnswer(option)}
+                  disabled={showResult}
+                  className={`w-full text-left p-4 rounded-lg border transition-all ${
+                    showCorrect ? 'bg-green-600/30 border-green-500 text-green-100' :
+                    showWrong ? 'bg-red-600/30 border-red-500 text-red-100' :
+                    isSelected ? 'bg-amber-600/30 border-amber-500' :
+                    'bg-stone-900/50 border-stone-700 hover:border-amber-600/50 hover:bg-stone-800/50'
+                  } ${showResult ? 'cursor-default' : 'cursor-pointer'}`}
+                >
+                  <span className="font-semibold mr-3 text-amber-400">
+                    {String.fromCharCode(65 + index)}.
+                  </span>
+                  {option}
+                  {showCorrect && <span className="float-right">✓</span>}
+                  {showWrong && <span className="float-right">✗</span>}
+                </button>
+              )
+            })}
+          </div>
         </div>
       </div>
-    )
-  }
-
-  return (
-    <main className="min-h-screen bg-gradient-to-b from-gray-900 to-black py-8">
-      {view === 'menu' && renderMenu()}
-      {view === 'category' && renderCategorySelection()}
-      {view === 'playing' && renderPlaying()}
-      {view === 'results' && renderResults()}
-    </main>
+    </div>
   )
 }
