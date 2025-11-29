@@ -1,62 +1,62 @@
-// app/auth/login/page.tsx
-// BarrelVerse Login Page
-
 'use client'
+
+export const dynamic = 'force-dynamic'
 
 import { useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { useAuth } from '@/lib/hooks/use-auth'
+import { createClient } from '@/lib/supabase/client'
 
 export default function LoginPage() {
   const router = useRouter()
-  const { signIn, loading, error } = useAuth()
-  
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
-  const [formError, setFormError] = useState<string | null>(null)
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
-    setFormError(null)
+    setLoading(true)
+    setError(null)
 
-    if (!email || !password) {
-      setFormError('Please fill in all fields')
-      return
-    }
+    try {
+      const supabase = createClient()
+      const { error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      })
 
-    const result = await signIn(email, password)
-    
-    if (result.error) {
-      setFormError(result.error.message)
-    } else {
+      if (error) throw error
+
       router.push('/')
+      router.refresh()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to sign in')
+    } finally {
+      setLoading(false)
     }
   }
 
   return (
-    <main className="min-h-screen bg-gradient-to-b from-gray-900 to-black flex items-center justify-center p-6">
+    <div className="min-h-screen bg-gradient-to-br from-amber-900 via-amber-800 to-stone-900 text-white flex items-center justify-center px-4">
       <div className="w-full max-w-md">
-        {/* Logo */}
         <div className="text-center mb-8">
           <Link href="/" className="inline-block">
-            <span className="text-4xl mb-2 block">🥃</span>
-            <h1 className="text-2xl font-bold text-white">BarrelVerse</h1>
+            <h1 className="text-4xl font-bold">🍾 BarrelVerse</h1>
           </Link>
-          <p className="text-gray-400 mt-2">Sign in to your account</p>
+          <p className="text-amber-200 mt-2">Sign in to your account</p>
         </div>
 
-        {/* Form */}
-        <form onSubmit={handleSubmit} className="bg-gray-800 rounded-2xl p-8 shadow-xl">
-          {(formError || error) && (
-            <div className="mb-6 p-4 bg-red-900/50 border border-red-500/50 rounded-xl text-red-300 text-sm">
-              {formError || error?.message}
-            </div>
-          )}
+        <div className="bg-stone-800/50 border border-amber-600/30 rounded-xl p-8">
+          <form onSubmit={handleLogin} className="space-y-6">
+            {error && (
+              <div className="bg-red-900/30 border border-red-600 text-red-300 px-4 py-3 rounded-lg text-sm">
+                {error}
+              </div>
+            )}
 
-          <div className="space-y-4">
             <div>
-              <label htmlFor="email" className="block text-sm font-medium text-gray-300 mb-2">
+              <label htmlFor="email" className="block text-amber-300 text-sm font-medium mb-2">
                 Email Address
               </label>
               <input
@@ -64,14 +64,14 @@ export default function LoginPage() {
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder="you@example.com"
-                className="w-full bg-gray-700 border border-gray-600 rounded-xl px-4 py-3 text-white placeholder-gray-400 focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500 transition-colors"
                 required
+                className="w-full bg-stone-900 border border-amber-600/30 rounded-lg px-4 py-3 text-white placeholder-stone-500 focus:border-amber-500 focus:outline-none focus:ring-1 focus:ring-amber-500"
+                placeholder="you@example.com"
               />
             </div>
 
             <div>
-              <label htmlFor="password" className="block text-sm font-medium text-gray-300 mb-2">
+              <label htmlFor="password" className="block text-amber-300 text-sm font-medium mb-2">
                 Password
               </label>
               <input
@@ -79,42 +79,41 @@ export default function LoginPage() {
                 type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                placeholder="••••••••"
-                className="w-full bg-gray-700 border border-gray-600 rounded-xl px-4 py-3 text-white placeholder-gray-400 focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500 transition-colors"
                 required
+                className="w-full bg-stone-900 border border-amber-600/30 rounded-lg px-4 py-3 text-white placeholder-stone-500 focus:border-amber-500 focus:outline-none focus:ring-1 focus:ring-amber-500"
+                placeholder="••••••••"
               />
             </div>
+
+            <button
+              type="submit"
+              disabled={loading}
+              className="w-full bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-white font-bold py-3 px-4 rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {loading ? 'Signing in...' : 'Sign In'}
+            </button>
+          </form>
+
+          <div className="mt-6 text-center text-sm">
+            <span className="text-stone-400">Don&apos;t have an account? </span>
+            <Link href="/auth/register" className="text-amber-400 hover:text-amber-300 font-medium">
+              Create one
+            </Link>
           </div>
 
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full mt-6 py-3 bg-amber-600 hover:bg-amber-700 disabled:bg-gray-600 disabled:cursor-not-allowed rounded-xl text-white font-semibold transition-colors"
-          >
-            {loading ? 'Signing in...' : 'Sign In'}
-          </button>
-
-          <div className="mt-6 text-center text-sm text-gray-400">
-            <Link href="/auth/forgot-password" className="hover:text-white transition-colors">
+          <div className="mt-4 text-center">
+            <Link href="/auth/forgot-password" className="text-sm text-stone-400 hover:text-amber-300">
               Forgot your password?
             </Link>
           </div>
-        </form>
+        </div>
 
-        {/* Sign up link */}
-        <p className="mt-6 text-center text-gray-400">
-          Don&apos;t have an account?{' '}
-          <Link href="/auth/register" className="text-amber-500 hover:text-amber-400 font-medium transition-colors">
-            Create one
+        <div className="mt-8 text-center">
+          <Link href="/" className="text-amber-300 hover:text-amber-200 text-sm">
+            ← Back to Home
           </Link>
-        </p>
-
-        {/* Age verification notice */}
-        <p className="mt-8 text-center text-xs text-gray-500">
-          By signing in, you confirm that you are of legal drinking age in your jurisdiction.
-          Must be 21+ in the United States.
-        </p>
+        </div>
       </div>
-    </main>
+    </div>
   )
 }
