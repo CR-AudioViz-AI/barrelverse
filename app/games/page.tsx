@@ -11,7 +11,7 @@ import { useTrivia, CATEGORY_INFO, DIFFICULTY_INFO } from '@/lib/hooks/use-trivi
 import { useAuth } from '@/lib/hooks/use-auth'
 import type { TriviaCategory, Difficulty, GameType } from '@/lib/types/database'
 
-// Game modes configuration
+// Game modes using actual GameType values from database
 const GAME_MODES: {
   id: GameType
   name: string
@@ -20,6 +20,7 @@ const GAME_MODES: {
   questionCount: number
   timeLimit: number
   multiplier: number
+  allowCategorySelect?: boolean
 }[] = [
   {
     id: 'quick_pour',
@@ -31,8 +32,8 @@ const GAME_MODES: {
     multiplier: 1,
   },
   {
-    id: 'master_distiller',
-    name: 'Master Distiller',
+    id: 'masters_challenge',
+    name: 'Masters Challenge',
     description: '25 challenging questions for experts',
     icon: '🏆',
     questionCount: 25,
@@ -40,19 +41,20 @@ const GAME_MODES: {
     multiplier: 2,
   },
   {
-    id: 'category_deep_dive',
-    name: 'Category Deep Dive',
+    id: 'daily_dram',
+    name: 'Daily Dram',
     description: 'Focus on one category of your choice',
     icon: '🎯',
     questionCount: 15,
     timeLimit: 25,
     multiplier: 1.5,
+    allowCategorySelect: true,
   },
   {
     id: 'speed_round',
     name: 'Speed Round',
     description: 'Quick-fire questions with short time limits',
-    icon: '👃',
+    icon: '⏱️',
     questionCount: 10,
     timeLimit: 15,
     multiplier: 1.5,
@@ -63,7 +65,6 @@ export default function GamesPage() {
   const { user, profile, loading: authLoading } = useAuth()
   const {
     questions,
-    currentIndex,
     score,
     proofEarned,
     answers,
@@ -126,11 +127,10 @@ export default function GamesPage() {
     const mode = GAME_MODES.find((m) => m.id === selectedMode)
     if (!mode) return
 
-    const category = selectedMode === 'category_deep_dive' && selectedCategory !== 'all'
+    const category = mode.allowCategorySelect && selectedCategory !== 'all'
       ? selectedCategory
       : undefined
 
-    // startGame(gameType, category?, difficulty?, questionCount?)
     await startGame(mode.id, category, selectedDifficulty, mode.questionCount)
     setTimeRemaining(mode.timeLimit)
     setSelectedAnswer(null)
@@ -146,7 +146,6 @@ export default function GamesPage() {
     const startTime = Date.now()
     await submitAnswer(currentQuestion.id, answer, Date.now() - startTime)
 
-    // Wait briefly to show result, then move to next question
     setTimeout(() => {
       setSelectedAnswer(null)
       setShowResult(false)
@@ -196,8 +195,8 @@ export default function GamesPage() {
                 <p className="text-stone-400 mb-4">{mode.description}</p>
                 <div className="flex gap-4 text-sm text-amber-400">
                   <span>📝 {mode.questionCount} questions</span>
-                  <span>⏱️ {mode.timeLimit}s per question</span>
-                  <span>💰 {mode.multiplier}x $PROOF</span>
+                  <span>⏱️ {mode.timeLimit}s</span>
+                  <span>💰 {mode.multiplier}x</span>
                 </div>
               </button>
             ))}
@@ -206,10 +205,7 @@ export default function GamesPage() {
           {!user && (
             <div className="mt-8 text-center">
               <p className="text-amber-300 mb-4">Sign in to save your progress and earn $PROOF!</p>
-              <Link
-                href="/auth/login"
-                className="inline-block bg-amber-600 hover:bg-amber-700 px-6 py-3 rounded-lg font-semibold transition-colors"
-              >
+              <Link href="/auth/login" className="inline-block bg-amber-600 hover:bg-amber-700 px-6 py-3 rounded-lg font-semibold transition-colors">
                 Sign In
               </Link>
             </div>
@@ -225,10 +221,7 @@ export default function GamesPage() {
     return (
       <div className="min-h-screen bg-gradient-to-br from-amber-900 via-amber-800 to-stone-900 text-white">
         <div className="container mx-auto px-4 py-8">
-          <button
-            onClick={() => setSelectedMode(null)}
-            className="inline-flex items-center text-amber-300 hover:text-amber-200 mb-8"
-          >
+          <button onClick={() => setSelectedMode(null)} className="inline-flex items-center text-amber-300 hover:text-amber-200 mb-8">
             ← Choose Different Mode
           </button>
 
@@ -239,7 +232,7 @@ export default function GamesPage() {
               <p className="text-stone-400">{mode?.description}</p>
             </div>
 
-            {selectedMode === 'category_deep_dive' && (
+            {mode?.allowCategorySelect && (
               <div className="mb-6">
                 <label className="block text-amber-300 mb-2 font-semibold">Select Category</label>
                 <select
@@ -249,9 +242,7 @@ export default function GamesPage() {
                 >
                   <option value="all">All Categories</option>
                   {Object.entries(CATEGORY_INFO).map(([key, info]) => (
-                    <option key={key} value={key}>
-                      {info.icon} {info.label}
-                    </option>
+                    <option key={key} value={key}>{info.icon} {info.label}</option>
                   ))}
                 </select>
               </div>
@@ -264,14 +255,10 @@ export default function GamesPage() {
                   <button
                     key={key}
                     onClick={() => setSelectedDifficulty(key as Difficulty)}
-                    className={`px-4 py-3 rounded-lg border transition-all ${
-                      selectedDifficulty === key
-                        ? 'bg-amber-600 border-amber-500 text-white'
-                        : 'bg-stone-900 border-stone-700 text-stone-300 hover:border-amber-600/50'
-                    }`}
+                    className={`px-4 py-3 rounded-lg border transition-all ${selectedDifficulty === key ? 'bg-amber-600 border-amber-500 text-white' : 'bg-stone-900 border-stone-700 text-stone-300 hover:border-amber-600/50'}`}
                   >
                     <div className="font-semibold">{info.label}</div>
-                    <div className="text-xs opacity-75">{info.multiplier}x $PROOF</div>
+                    <div className="text-xs opacity-75">{info.multiplier}x</div>
                   </button>
                 ))}
               </div>
@@ -280,7 +267,7 @@ export default function GamesPage() {
             <button
               onClick={handleStartGame}
               disabled={loading}
-              className="w-full bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-white font-bold py-4 px-8 rounded-lg text-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+              className="w-full bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-white font-bold py-4 px-8 rounded-lg text-xl transition-all disabled:opacity-50"
             >
               {loading ? 'Loading...' : '🎮 Start Game'}
             </button>
@@ -320,18 +307,8 @@ export default function GamesPage() {
             </div>
 
             <div className="flex gap-4">
-              <button
-                onClick={handleStartGame}
-                className="flex-1 bg-amber-600 hover:bg-amber-700 py-3 px-6 rounded-lg font-semibold transition-colors"
-              >
-                Play Again
-              </button>
-              <button
-                onClick={handleEndGame}
-                className="flex-1 bg-stone-700 hover:bg-stone-600 py-3 px-6 rounded-lg font-semibold transition-colors"
-              >
-                Choose Mode
-              </button>
+              <button onClick={handleStartGame} className="flex-1 bg-amber-600 hover:bg-amber-700 py-3 px-6 rounded-lg font-semibold transition-colors">Play Again</button>
+              <button onClick={handleEndGame} className="flex-1 bg-stone-700 hover:bg-stone-600 py-3 px-6 rounded-lg font-semibold transition-colors">Choose Mode</button>
             </div>
           </div>
         </div>
@@ -359,33 +336,18 @@ export default function GamesPage() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-amber-900 via-amber-800 to-stone-900 text-white">
       <div className="container mx-auto px-4 py-8">
-        {/* Header */}
         <div className="flex justify-between items-center mb-6">
           <div className="flex items-center gap-4">
-            <span className="text-amber-300">
-              Question {progress.current}/{progress.total}
-            </span>
-            <span className="bg-stone-800 px-3 py-1 rounded-full text-sm">
-              {categoryInfo?.icon} {categoryInfo?.label}
-            </span>
+            <span className="text-amber-300">Question {progress.current}/{progress.total}</span>
+            <span className="bg-stone-800 px-3 py-1 rounded-full text-sm">{categoryInfo?.icon} {categoryInfo?.label}</span>
           </div>
-          <button
-            onClick={handleEndGame}
-            className="text-stone-400 hover:text-white transition-colors"
-          >
-            End Game
-          </button>
+          <button onClick={handleEndGame} className="text-stone-400 hover:text-white transition-colors">End Game</button>
         </div>
 
-        {/* Progress Bar */}
         <div className="w-full h-2 bg-stone-800 rounded-full mb-8">
-          <div
-            className="h-full bg-gradient-to-r from-amber-500 to-amber-400 rounded-full transition-all"
-            style={{ width: `${progress.percentage}%` }}
-          />
+          <div className="h-full bg-gradient-to-r from-amber-500 to-amber-400 rounded-full transition-all" style={{ width: `${progress.percentage}%` }} />
         </div>
 
-        {/* Stats Row */}
         <div className="flex justify-center gap-8 mb-8">
           <div className="text-center">
             <div className="text-2xl font-bold text-amber-400">{score}</div>
@@ -396,28 +358,20 @@ export default function GamesPage() {
             <div className="text-stone-400 text-sm">Streak</div>
           </div>
           <div className="text-center">
-            <div className={`text-2xl font-bold ${timeRemaining <= 10 ? 'text-red-400 animate-pulse' : 'text-white'}`}>
-              {timeRemaining}s
-            </div>
+            <div className={`text-2xl font-bold ${timeRemaining <= 10 ? 'text-red-400 animate-pulse' : 'text-white'}`}>{timeRemaining}s</div>
             <div className="text-stone-400 text-sm">Time</div>
           </div>
         </div>
 
-        {/* Question Card */}
         <div className="max-w-2xl mx-auto">
           <div className="bg-stone-800/50 border border-amber-600/30 rounded-xl p-8 mb-6">
             <div className="flex justify-between items-start mb-4">
-              <span className="px-3 py-1 rounded-full text-sm bg-stone-700 text-stone-300">
-                {difficultyInfo?.label}
-              </span>
-              <span className="text-amber-400 text-sm">
-                +{currentQuestion.points * (mode?.multiplier || 1)} $PROOF
-              </span>
+              <span className="px-3 py-1 rounded-full text-sm bg-stone-700 text-stone-300">{difficultyInfo?.label}</span>
+              <span className="text-amber-400 text-sm">+{currentQuestion.points * (mode?.multiplier || 1)} $PROOF</span>
             </div>
             <h2 className="text-xl font-semibold">{currentQuestion.question}</h2>
           </div>
 
-          {/* Answer Options */}
           <div className="grid gap-3">
             {currentQuestion.options.map((option, index) => {
               const isSelected = selectedAnswer === option
@@ -430,16 +384,9 @@ export default function GamesPage() {
                   key={index}
                   onClick={() => handleAnswer(option)}
                   disabled={showResult}
-                  className={`w-full text-left p-4 rounded-lg border transition-all ${
-                    showCorrect ? 'bg-green-600/30 border-green-500 text-green-100' :
-                    showWrong ? 'bg-red-600/30 border-red-500 text-red-100' :
-                    isSelected ? 'bg-amber-600/30 border-amber-500' :
-                    'bg-stone-900/50 border-stone-700 hover:border-amber-600/50 hover:bg-stone-800/50'
-                  } ${showResult ? 'cursor-default' : 'cursor-pointer'}`}
+                  className={`w-full text-left p-4 rounded-lg border transition-all ${showCorrect ? 'bg-green-600/30 border-green-500 text-green-100' : showWrong ? 'bg-red-600/30 border-red-500 text-red-100' : isSelected ? 'bg-amber-600/30 border-amber-500' : 'bg-stone-900/50 border-stone-700 hover:border-amber-600/50 hover:bg-stone-800/50'} ${showResult ? 'cursor-default' : 'cursor-pointer'}`}
                 >
-                  <span className="font-semibold mr-3 text-amber-400">
-                    {String.fromCharCode(65 + index)}.
-                  </span>
+                  <span className="font-semibold mr-3 text-amber-400">{String.fromCharCode(65 + index)}.</span>
                   {option}
                   {showCorrect && <span className="float-right">✓</span>}
                   {showWrong && <span className="float-right">✗</span>}
