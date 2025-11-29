@@ -9,10 +9,18 @@ import { useState, useEffect, useMemo } from 'react'
 import Link from 'next/link'
 import { useTrivia, CATEGORY_INFO, DIFFICULTY_INFO } from '@/lib/hooks/use-trivia'
 import { useAuth } from '@/lib/hooks/use-auth'
-import type { TriviaCategory, Difficulty } from '@/lib/types/database'
+import type { TriviaCategory, Difficulty, GameType } from '@/lib/types/database'
 
 // Game modes configuration
-const GAME_MODES = [
+const GAME_MODES: {
+  id: GameType
+  name: string
+  description: string
+  icon: string
+  questionCount: number
+  timeLimit: number
+  multiplier: number
+}[] = [
   {
     id: 'quick_pour',
     name: 'Quick Pour',
@@ -41,12 +49,12 @@ const GAME_MODES = [
     multiplier: 1.5,
   },
   {
-    id: 'tasting_notes',
-    name: 'Tasting Notes Challenge',
-    description: 'Identify spirits by their flavor profiles',
+    id: 'speed_round',
+    name: 'Speed Round',
+    description: 'Quick-fire questions with short time limits',
     icon: '👃',
     questionCount: 10,
-    timeLimit: 45,
+    timeLimit: 15,
     multiplier: 1.5,
   },
 ]
@@ -70,7 +78,7 @@ export default function GamesPage() {
     progress,
   } = useTrivia()
 
-  const [selectedMode, setSelectedMode] = useState<string | null>(null)
+  const [selectedMode, setSelectedMode] = useState<GameType | null>(null)
   const [selectedCategory, setSelectedCategory] = useState<TriviaCategory | 'all'>('all')
   const [selectedDifficulty, setSelectedDifficulty] = useState<Difficulty>('medium')
   const [selectedAnswer, setSelectedAnswer] = useState<string | null>(null)
@@ -122,7 +130,8 @@ export default function GamesPage() {
       ? selectedCategory
       : undefined
 
-    await startGame(mode.questionCount, category, selectedDifficulty)
+    // startGame(gameType, category?, difficulty?, questionCount?)
+    await startGame(mode.id, category, selectedDifficulty, mode.questionCount)
     setTimeRemaining(mode.timeLimit)
     setSelectedAnswer(null)
     setShowResult(false)
@@ -398,7 +407,7 @@ export default function GamesPage() {
         <div className="max-w-2xl mx-auto">
           <div className="bg-stone-800/50 border border-amber-600/30 rounded-xl p-8 mb-6">
             <div className="flex justify-between items-start mb-4">
-              <span className={`px-3 py-1 rounded-full text-sm bg-${difficultyInfo?.color}-600/30 text-${difficultyInfo?.color}-300`}>
+              <span className="px-3 py-1 rounded-full text-sm bg-stone-700 text-stone-300">
                 {difficultyInfo?.label}
               </span>
               <span className="text-amber-400 text-sm">
