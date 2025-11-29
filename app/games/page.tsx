@@ -373,7 +373,7 @@ export default function GamesPage() {
           </div>
 
           <div className="grid gap-3">
-            {currentQuestion.options.map((option, index) => {
+            {currentQuestion.shuffledAnswers.map((option, index) => {
               const isSelected = selectedAnswer === option
               const isCorrect = option === currentQuestion.correct_answer
               const showCorrect = showResult && isCorrect
