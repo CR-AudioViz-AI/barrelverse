@@ -3,7 +3,6 @@
 import Link from 'next/link'
 import { useState, useEffect } from 'react'
 
-// Real category data
 const CATEGORIES = [
   { id: 'bourbon', name: 'Bourbon', icon: '🥃', color: 'bg-amber-600' },
   { id: 'scotch', name: 'Scotch', icon: '🏴󠁧󠁢󠁳󠁣󠁴󠁿', color: 'bg-amber-700' },
@@ -15,42 +14,40 @@ const CATEGORIES = [
   { id: 'cognac', name: 'Cognac', icon: '🍇', color: 'bg-indigo-600' },
 ]
 
-// Only features that actually work
 const FEATURES = [
   {
     icon: '🎮',
     title: 'Trivia Games',
-    description: 'Test your spirits knowledge with 4 game modes and 46 real trivia questions',
+    description: '500+ questions across 4 game modes. Test your spirits knowledge!',
     link: '/games',
     ready: true,
   },
   {
     icon: '📱',
     title: 'Spirit Collection',
-    description: 'Browse 28 premium spirits with detailed tasting notes and pricing',
+    description: 'Browse 100+ premium spirits with detailed tasting notes',
     link: '/collection',
     ready: true,
   },
   {
     icon: '🏆',
     title: '$PROOF Rewards',
-    description: 'Earn tokens for playing games. Redeem for real rewards (coming soon)',
-    link: '/games',
+    description: 'Earn tokens and redeem for real merchandise and experiences',
+    link: '/rewards',
     ready: true,
   },
   {
-    icon: '📚',
-    title: 'Spirits Academy',
-    description: '3 educational courses from beginner to advanced (coming soon)',
-    link: '#',
-    ready: false,
+    icon: '📊',
+    title: 'Leaderboards',
+    description: 'Compete with other enthusiasts and climb the rankings',
+    link: '/leaderboard',
+    ready: true,
   },
 ]
 
-// Real stats from database
 const STATS = [
-  { value: '28', label: 'Premium Spirits' },
-  { value: '46', label: 'Trivia Questions' },
+  { value: '100+', label: 'Premium Spirits' },
+  { value: '500+', label: 'Trivia Questions' },
   { value: '4', label: 'Game Modes' },
   { value: '8', label: 'Categories' },
 ]
@@ -61,7 +58,6 @@ export default function HomePage() {
 
   useEffect(() => {
     setMounted(true)
-    // Check if already verified in this session
     if (typeof window !== 'undefined') {
       const verified = sessionStorage.getItem('ageVerified')
       if (verified === 'true') {
@@ -81,21 +77,15 @@ export default function HomePage() {
     }
   }
 
-  // Prevent hydration mismatch
-  if (!mounted) {
-    return null
-  }
+  if (!mounted) return null
 
-  // Age verification modal
   if (!ageVerified) {
     return (
       <div className="fixed inset-0 bg-black/90 flex items-center justify-center z-50 p-4">
         <div className="bg-stone-900 border border-amber-600/30 rounded-2xl max-w-md w-full p-8 text-center">
           <span className="text-6xl mb-4 block">🥃</span>
           <h1 className="text-2xl font-bold text-white mb-2">Welcome to BarrelVerse</h1>
-          <p className="text-stone-300 mb-6">
-            You must be of legal drinking age to access this site.
-          </p>
+          <p className="text-stone-300 mb-6">You must be of legal drinking age to access this site.</p>
           <div className="space-y-3">
             <button
               onClick={() => handleAgeVerification(true)}
@@ -128,12 +118,15 @@ export default function HomePage() {
               <span className="text-3xl">🍾</span>
               <span className="text-xl md:text-2xl font-bold text-white">BarrelVerse</span>
             </div>
-            <nav className="flex items-center gap-2 md:gap-4">
+            <nav className="flex items-center gap-1 md:gap-2">
               <Link href="/games" className="text-amber-300 hover:text-amber-200 text-sm md:text-base px-2 md:px-3 py-2">
                 Games
               </Link>
-              <Link href="/collection" className="text-amber-300 hover:text-amber-200 text-sm md:text-base px-2 md:px-3 py-2">
+              <Link href="/collection" className="text-amber-300 hover:text-amber-200 text-sm md:text-base px-2 md:px-3 py-2 hidden sm:block">
                 Collection
+              </Link>
+              <Link href="/leaderboard" className="text-amber-300 hover:text-amber-200 text-sm md:text-base px-2 md:px-3 py-2 hidden sm:block">
+                Ranks
               </Link>
               <Link href="/auth/login" className="bg-amber-600 hover:bg-amber-700 text-white text-sm md:text-base px-3 md:px-4 py-2 rounded-lg transition-colors">
                 Sign In
@@ -143,7 +136,7 @@ export default function HomePage() {
         </div>
       </header>
 
-      {/* Hero Section */}
+      {/* Hero */}
       <section className="py-12 md:py-20 px-4">
         <div className="container mx-auto text-center">
           <h1 className="text-3xl md:text-5xl lg:text-6xl font-bold text-white mb-4 md:mb-6 leading-tight">
@@ -151,26 +144,20 @@ export default function HomePage() {
             <span className="text-amber-400">Premium Spirits</span>
           </h1>
           <p className="text-lg md:text-xl text-stone-300 mb-8 max-w-2xl mx-auto px-4">
-            Play trivia, build your collection, earn $PROOF rewards, and become a spirits connoisseur.
+            Play trivia, build your collection, earn $PROOF rewards, and compete on the leaderboard.
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center px-4">
-            <Link
-              href="/games"
-              className="bg-amber-600 hover:bg-amber-700 text-white font-bold py-3 md:py-4 px-6 md:px-8 rounded-xl text-base md:text-lg transition-colors"
-            >
+            <Link href="/games" className="bg-amber-600 hover:bg-amber-700 text-white font-bold py-3 md:py-4 px-6 md:px-8 rounded-xl text-base md:text-lg transition-colors">
               🎮 Play Trivia Now
             </Link>
-            <Link
-              href="/collection"
-              className="border border-amber-600 text-amber-400 hover:bg-amber-600/10 font-bold py-3 md:py-4 px-6 md:px-8 rounded-xl text-base md:text-lg transition-colors"
-            >
+            <Link href="/collection" className="border border-amber-600 text-amber-400 hover:bg-amber-600/10 font-bold py-3 md:py-4 px-6 md:px-8 rounded-xl text-base md:text-lg transition-colors">
               📱 Browse Spirits
             </Link>
           </div>
         </div>
       </section>
 
-      {/* Stats Section */}
+      {/* Stats */}
       <section className="py-8 md:py-12 border-y border-amber-900/30 bg-stone-900/50">
         <div className="container mx-auto px-4">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-8">
@@ -184,7 +171,7 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* Categories Section */}
+      {/* Categories */}
       <section className="py-12 md:py-16 px-4">
         <div className="container mx-auto">
           <h2 className="text-2xl md:text-3xl font-bold text-white text-center mb-8">
@@ -207,7 +194,7 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* Features Section */}
+      {/* Features */}
       <section className="py-12 md:py-16 px-4 bg-stone-900/50">
         <div className="container mx-auto">
           <h2 className="text-2xl md:text-3xl font-bold text-white text-center mb-8">
@@ -215,30 +202,24 @@ export default function HomePage() {
           </h2>
           <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
             {FEATURES.map((feature) => (
-              <div
+              <Link
                 key={feature.title}
-                className={`bg-stone-800/50 border border-amber-900/30 rounded-xl p-6 ${feature.ready ? 'hover:border-amber-600/50' : 'opacity-75'} transition-all`}
+                href={feature.link}
+                className="bg-stone-800/50 border border-amber-900/30 rounded-xl p-6 hover:border-amber-600/50 hover:bg-stone-800 transition-all block"
               >
                 <span className="text-4xl block mb-4">{feature.icon}</span>
                 <h3 className="text-lg font-bold text-white mb-2">{feature.title}</h3>
                 <p className="text-stone-400 text-sm mb-4">{feature.description}</p>
-                {feature.ready ? (
-                  <Link
-                    href={feature.link}
-                    className="text-amber-400 hover:text-amber-300 text-sm font-medium"
-                  >
-                    Get Started →
-                  </Link>
-                ) : (
-                  <span className="text-stone-500 text-sm">Coming Soon</span>
-                )}
-              </div>
+                <span className="text-amber-400 hover:text-amber-300 text-sm font-medium">
+                  Get Started →
+                </span>
+              </Link>
             ))}
           </div>
         </div>
       </section>
 
-      {/* CTA Section */}
+      {/* CTA */}
       <section className="py-12 md:py-16 px-4">
         <div className="container mx-auto">
           <div className="bg-gradient-to-r from-amber-900/50 to-amber-800/50 border border-amber-600/30 rounded-2xl p-8 md:p-12 text-center">
@@ -248,10 +229,7 @@ export default function HomePage() {
             <p className="text-stone-300 mb-6 max-w-xl mx-auto">
               Start playing trivia now and earn $PROOF tokens. No account required to play!
             </p>
-            <Link
-              href="/games"
-              className="inline-block bg-amber-600 hover:bg-amber-700 text-white font-bold py-3 px-8 rounded-xl text-lg transition-colors"
-            >
+            <Link href="/games" className="inline-block bg-amber-600 hover:bg-amber-700 text-white font-bold py-3 px-8 rounded-xl text-lg transition-colors">
               Start Playing Free
             </Link>
           </div>
@@ -266,14 +244,14 @@ export default function HomePage() {
               <span className="text-2xl">🍾</span>
               <span className="text-white font-bold">BarrelVerse</span>
             </div>
-            <div className="flex gap-6 text-stone-400 text-sm">
+            <div className="flex flex-wrap justify-center gap-6 text-stone-400 text-sm">
               <Link href="/games" className="hover:text-amber-300">Games</Link>
               <Link href="/collection" className="hover:text-amber-300">Collection</Link>
+              <Link href="/rewards" className="hover:text-amber-300">Rewards</Link>
+              <Link href="/leaderboard" className="hover:text-amber-300">Leaderboard</Link>
               <Link href="/auth/login" className="hover:text-amber-300">Sign In</Link>
             </div>
-            <p className="text-stone-500 text-sm">
-              © 2025 CR AudioViz AI, LLC
-            </p>
+            <p className="text-stone-500 text-sm">© 2025 CR AudioViz AI</p>
           </div>
           <p className="text-center text-stone-600 text-xs mt-4">
             Please drink responsibly. Must be 21+ to use this site.
