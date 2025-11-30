@@ -1,171 +1,189 @@
-// lib/hooks/use-trivia.ts
-// BarrelVerse Trivia Game Hook
-
 'use client'
 
-import { useState, useCallback } from 'react'
-import { getClient } from '@/lib/supabase/client'
+import { useState, useCallback, useMemo, useRef } from 'react'
+import { createClient } from '@/lib/supabase/client'
 import type { TriviaQuestion, TriviaCategory, Difficulty, GameType } from '@/lib/types/database'
 
-interface GameState {
+// Category display information
+export const CATEGORY_INFO: Record<TriviaCategory, { label: string; icon: string; color: string }> = {
+  bourbon: { label: 'Bourbon', icon: '🥃', color: 'amber' },
+  scotch: { label: 'Scotch', icon: '🏴󠁧󠁢󠁳󠁣󠁴󠁿', color: 'amber' },
+  irish: { label: 'Irish', icon: '☘️', color: 'green' },
+  japanese: { label: 'Japanese', icon: '🇯🇵', color: 'red' },
+  tequila: { label: 'Tequila', icon: '🌵', color: 'lime' },
+  rum: { label: 'Rum', icon: '🏝️', color: 'orange' },
+  gin: { label: 'Gin', icon: '🫒', color: 'teal' },
+  cognac: { label: 'Cognac', icon: '🍇', color: 'purple' },
+  general: { label: 'General', icon: '📚', color: 'blue' },
+  production: { label: 'Production', icon: '🏭', color: 'stone' },
+  history: { label: 'History', icon: '📜', color: 'amber' },
+}
+
+export const DIFFICULTY_INFO: Record<Difficulty, { label: string; multiplier: number; color: string }> = {
+  easy: { label: 'Easy', multiplier: 1, color: 'green' },
+  medium: { label: 'Medium', multiplier: 1.5, color: 'yellow' },
+  hard: { label: 'Hard', multiplier: 2, color: 'orange' },
+  expert: { label: 'Expert', multiplier: 3, color: 'red' },
+}
+
+interface TriviaState {
   questions: TriviaQuestion[]
+  shuffledAnswersMap: Map<string, string[]>  // Store shuffled answers per question ID
   currentIndex: number
   score: number
   proofEarned: number
-  answers: { questionId: string; correct: boolean; timeMs: number }[]
-  gameType: GameType
-  category: TriviaCategory | null
-  difficulty: Difficulty | null
+  answers: { questionId: string; answer: string; correct: boolean; timeMs: number }[]
   isComplete: boolean
-  isLoading: boolean
-  error: Error | null
+  gameType: GameType | null
+  startTime: Date | null
 }
 
-const initialState: GameState = {
+const initialState: TriviaState = {
   questions: [],
+  shuffledAnswersMap: new Map(),
   currentIndex: 0,
   score: 0,
   proofEarned: 0,
   answers: [],
-  gameType: 'quick_pour',
-  category: null,
-  difficulty: null,
   isComplete: false,
-  isLoading: false,
-  error: null,
+  gameType: null,
+  startTime: null,
+}
+
+// Stable shuffle function using Fisher-Yates
+function shuffleArray<T>(array: T[]): T[] {
+  const shuffled = [...array]
+  for (let i = shuffled.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1))
+    ;[shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]]
+  }
+  return shuffled
 }
 
 export function useTrivia() {
-  const [state, setState] = useState<GameState>(initialState)
-  const supabase = getClient()
-
-  // Fetch random trivia questions
-  const fetchQuestions = useCallback(async (
-    category?: TriviaCategory,
-    difficulty?: Difficulty,
-    limit: number = 10
-  ): Promise<TriviaQuestion[]> => {
-    let query = supabase
-      .from('bv_trivia_questions')
-      .select('*')
-      .eq('is_active', true)
-
-    if (category) {
-      query = query.eq('category', category)
+  const [state, setState] = useState<TriviaState>(initialState)
+  const [isLoading, setIsLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  
+  // Pre-shuffle answers when questions load
+  const preprocessQuestions = useCallback((questions: TriviaQuestion[]): Map<string, string[]> => {
+    const answersMap = new Map<string, string[]>()
+    
+    for (const question of questions) {
+      let wrongAnswers: string[]
+      if (typeof question.wrong_answers === 'string') {
+        try {
+          wrongAnswers = JSON.parse(question.wrong_answers)
+        } catch {
+          wrongAnswers = []
+        }
+      } else if (Array.isArray(question.wrong_answers)) {
+        wrongAnswers = question.wrong_answers as string[]
+      } else {
+        wrongAnswers = []
+      }
+      
+      const allAnswers = [question.correct_answer, ...wrongAnswers]
+      answersMap.set(question.id, shuffleArray(allAnswers))
     }
-    if (difficulty) {
-      query = query.eq('difficulty', difficulty)
-    }
-
-    const { data, error } = await query.limit(limit * 3) // Fetch extra for randomization
-
-    if (error) throw error
-
-    // Shuffle and take requested amount
-    const shuffled = (data || []).sort(() => Math.random() - 0.5)
-    return shuffled.slice(0, limit)
-  }, [supabase])
+    
+    return answersMap
+  }, [])
 
   // Start a new game
-  const startGame = async (
-    gameType: GameType = 'quick_pour',
+  const startGame = useCallback(async (
+    gameType: GameType,
     category?: TriviaCategory,
     difficulty?: Difficulty,
-    questionCount: number = 10
+    limit = 10
   ) => {
-    setState(prev => ({ ...prev, isLoading: true, error: null }))
+    setIsLoading(true)
+    setError(null)
 
     try {
-      const questions = await fetchQuestions(category, difficulty, questionCount)
+      const supabase = createClient()
+      let query = supabase
+        .from('bv_trivia_questions')
+        .select('*')
+        .eq('is_active', true)
 
-      if (questions.length === 0) {
-        throw new Error('No questions available for selected criteria')
+      if (category) {
+        query = query.eq('category', category)
+      }
+      if (difficulty) {
+        query = query.eq('difficulty', difficulty)
       }
 
+      const { data, error: fetchError } = await query
+
+      if (fetchError) throw fetchError
+
+      // Shuffle and limit questions
+      const shuffled = shuffleArray(data || []).slice(0, limit)
+      
+      // Pre-shuffle all answers ONCE
+      const answersMap = preprocessQuestions(shuffled)
+
       setState({
-        questions,
+        questions: shuffled,
+        shuffledAnswersMap: answersMap,
         currentIndex: 0,
         score: 0,
         proofEarned: 0,
         answers: [],
-        gameType,
-        category: category || null,
-        difficulty: difficulty || null,
         isComplete: false,
-        isLoading: false,
-        error: null,
+        gameType,
+        startTime: new Date(),
       })
-
-      return { success: true, questionCount: questions.length }
-    } catch (error) {
-      setState(prev => ({
-        ...prev,
-        isLoading: false,
-        error: error as Error,
-      }))
-      return { success: false, error: error as Error }
+    } catch (err) {
+      console.error('Error starting game:', err)
+      setError('Failed to load questions')
+    } finally {
+      setIsLoading(false)
     }
-  }
+  }, [preprocessQuestions])
 
   // Submit an answer
-  const submitAnswer = (selectedAnswer: string, timeMs: number = 0) => {
+  const submitAnswer = useCallback(async (answer: string, responseTimeMs: number) => {
     const currentQuestion = state.questions[state.currentIndex]
-    if (!currentQuestion || state.isComplete) return null
+    if (!currentQuestion) return null
 
-    const isCorrect = selectedAnswer === currentQuestion.correct_answer
-    const proofForQuestion = isCorrect ? currentQuestion.proof_reward : 0
+    const isCorrect = answer === currentQuestion.correct_answer
+    const difficultyMultiplier = DIFFICULTY_INFO[currentQuestion.difficulty]?.multiplier || 1
+    const proofForQuestion = isCorrect ? Math.round((currentQuestion.proof_reward || 10) * difficultyMultiplier) : 0
 
-    const answer = {
-      questionId: currentQuestion.id,
-      correct: isCorrect,
-      timeMs,
-    }
-
-    const newAnswers = [...state.answers, answer]
-    const newScore = state.score + (isCorrect ? 1 : 0)
-    const newProofEarned = state.proofEarned + proofForQuestion
     const isLastQuestion = state.currentIndex >= state.questions.length - 1
 
     setState(prev => ({
       ...prev,
+      score: isCorrect ? prev.score + 1 : prev.score,
+      proofEarned: prev.proofEarned + proofForQuestion,
+      answers: [...prev.answers, {
+        questionId: currentQuestion.id,
+        answer,
+        correct: isCorrect,
+        timeMs: responseTimeMs,
+      }],
       currentIndex: isLastQuestion ? prev.currentIndex : prev.currentIndex + 1,
-      score: newScore,
-      proofEarned: newProofEarned,
-      answers: newAnswers,
       isComplete: isLastQuestion,
     }))
 
     return {
-      isCorrect,
+      correct: isCorrect,
       correctAnswer: currentQuestion.correct_answer,
       explanation: currentQuestion.explanation,
       proofEarned: proofForQuestion,
       isComplete: isLastQuestion,
     }
-  }
+  }, [state.currentIndex, state.questions])
 
-  // Get current question with shuffled answers
-  const getCurrentQuestion = () => {
+  // Get current question with PRE-SHUFFLED answers (stable - no re-shuffle on render)
+  const currentQuestion = useMemo(() => {
     const question = state.questions[state.currentIndex]
     if (!question) return null
 
-    // Parse wrong_answers if it's a string
-    let wrongAnswers: string[]
-    if (typeof question.wrong_answers === 'string') {
-      try {
-        wrongAnswers = JSON.parse(question.wrong_answers)
-      } catch {
-        wrongAnswers = []
-      }
-    } else if (Array.isArray(question.wrong_answers)) {
-      wrongAnswers = question.wrong_answers as string[]
-    } else {
-      wrongAnswers = []
-    }
-
-    // Combine and shuffle answers
-    const allAnswers = [question.correct_answer, ...wrongAnswers]
-    const shuffledAnswers = allAnswers.sort(() => Math.random() - 0.5)
+    // Get the pre-shuffled answers from the map
+    const shuffledAnswers = state.shuffledAnswersMap.get(question.id) || []
 
     return {
       ...question,
@@ -173,79 +191,76 @@ export function useTrivia() {
       questionNumber: state.currentIndex + 1,
       totalQuestions: state.questions.length,
     }
-  }
+  }, [state.questions, state.currentIndex, state.shuffledAnswersMap])
 
   // Save game session to database
-  const saveGameSession = async (userId?: string) => {
+  const saveGameSession = useCallback(async (userId?: string) => {
     if (state.questions.length === 0) return { success: false, error: new Error('No game to save') }
 
     try {
-      const { data, error } = await supabase
-        .from('bv_game_sessions')
-        .insert({
-          user_id: userId || null,
-          game_type: state.gameType,
-          category: state.category,
-          difficulty: state.difficulty,
-          total_questions: state.questions.length,
-          correct_answers: state.score,
-          total_proof_earned: state.proofEarned,
-          time_taken: state.answers.reduce((sum, a) => sum + a.timeMs, 0),
-          completed: state.isComplete,
-          completed_at: state.isComplete ? new Date().toISOString() : null,
+      const supabase = createClient()
+      const { error: saveError } = await supabase.from('bv_game_sessions').insert({
+        user_id: userId,
+        game_type: state.gameType,
+        total_questions: state.questions.length,
+        correct_answers: state.score,
+        proof_earned: state.proofEarned,
+        completed_at: new Date().toISOString(),
+      })
+
+      if (saveError) throw saveError
+
+      // Update user's proof balance if logged in
+      if (userId && state.proofEarned > 0) {
+        const { error: updateError } = await supabase.rpc('add_proof', {
+          p_user_id: userId,
+          p_amount: state.proofEarned,
+          p_transaction_type: 'trivia_reward',
+          p_description: `${state.gameType} game: ${state.score}/${state.questions.length} correct`,
         })
-        .select()
-        .single()
-
-      if (error) throw error
-
-      // Save individual question progress if user is logged in
-      if (userId && state.answers.length > 0) {
-        const progressData = state.answers.map(answer => ({
-          user_id: userId,
-          question_id: answer.questionId,
-          answered_correctly: answer.correct,
-          time_to_answer: answer.timeMs,
-          proof_earned: answer.correct ? 
-            state.questions.find(q => q.id === answer.questionId)?.proof_reward || 0 : 0,
-        }))
-
-        await supabase.from('bv_trivia_progress').insert(progressData)
+        if (updateError) console.error('Failed to add proof:', updateError)
       }
 
-      return { success: true, sessionId: data?.id }
-    } catch (error) {
-      return { success: false, error: error as Error }
+      return { success: true }
+    } catch (err) {
+      console.error('Error saving game:', err)
+      return { success: false, error: err }
     }
-  }
+  }, [state])
 
   // Reset game
-  const resetGame = () => {
+  const resetGame = useCallback(() => {
     setState(initialState)
-  }
+  }, [])
 
   // Get game stats
-  const getGameStats = () => {
-    const totalTime = state.answers.reduce((sum, a) => sum + a.timeMs, 0)
-    const accuracy = state.questions.length > 0 
-      ? (state.score / state.questions.length) * 100 
+  const getGameStats = useCallback(() => {
+    const totalQuestions = state.questions.length
+    const correctAnswers = state.score
+    const accuracy = totalQuestions > 0 ? Math.round((correctAnswers / totalQuestions) * 100) : 0
+    const avgTimeMs = state.answers.length > 0
+      ? Math.round(state.answers.reduce((sum, a) => sum + a.timeMs, 0) / state.answers.length)
       : 0
 
     return {
-      score: state.score,
-      total: state.questions.length,
-      accuracy: Math.round(accuracy),
+      total: totalQuestions,
+      score: correctAnswers,
+      accuracy,
+      avgTimeMs,
       proofEarned: state.proofEarned,
-      totalTimeMs: totalTime,
-      averageTimeMs: state.answers.length > 0 
-        ? Math.round(totalTime / state.answers.length) 
-        : 0,
+      gameType: state.gameType,
     }
-  }
+  }, [state])
 
   return {
-    ...state,
-    currentQuestion: getCurrentQuestion(),
+    questions: state.questions,
+    currentQuestion,
+    score: state.score,
+    proofEarned: state.proofEarned,
+    answers: state.answers,
+    isComplete: state.isComplete,
+    isLoading,
+    error,
     startGame,
     submitAnswer,
     saveGameSession,
@@ -259,32 +274,4 @@ export function useTrivia() {
         : 0,
     },
   }
-}
-
-// Category display info
-export const CATEGORY_INFO: Record<TriviaCategory, { label: string; icon: string; color: string }> = {
-  bourbon: { label: 'Bourbon', icon: '🥃', color: 'amber' },
-  scotch: { label: 'Scotch', icon: '🏴󠁧󠁢󠁳󠁣󠁴󠁿', color: 'orange' },
-  irish: { label: 'Irish', icon: '🍀', color: 'green' },
-  japanese: { label: 'Japanese', icon: '🇯🇵', color: 'red' },
-  wine: { label: 'Wine', icon: '🍷', color: 'purple' },
-  beer: { label: 'Beer', icon: '🍺', color: 'yellow' },
-  tequila: { label: 'Tequila', icon: '🌵', color: 'lime' },
-  rum: { label: 'Rum', icon: '🏝️', color: 'brown' },
-  gin: { label: 'Gin', icon: '🌿', color: 'cyan' },
-  vodka: { label: 'Vodka', icon: '❄️', color: 'blue' },
-  cognac: { label: 'Cognac', icon: '🍇', color: 'violet' },
-  sake: { label: 'Sake', icon: '🍶', color: 'slate' },
-  general: { label: 'General', icon: '📚', color: 'gray' },
-  history: { label: 'History', icon: '📜', color: 'stone' },
-  production: { label: 'Production', icon: '🏭', color: 'zinc' },
-  brands: { label: 'Brands', icon: '🏷️', color: 'neutral' },
-}
-
-// Difficulty display info
-export const DIFFICULTY_INFO: Record<Difficulty, { label: string; color: string; multiplier: number }> = {
-  easy: { label: 'Easy', color: 'green', multiplier: 1 },
-  medium: { label: 'Medium', color: 'yellow', multiplier: 1.5 },
-  hard: { label: 'Hard', color: 'orange', multiplier: 2 },
-  expert: { label: 'Expert', color: 'red', multiplier: 2.5 },
 }
