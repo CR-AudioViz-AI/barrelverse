@@ -4,6 +4,46 @@ import { useState, useCallback, useMemo } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import type { TriviaQuestion, TriviaCategory, Difficulty, GameType } from '@/lib/types/database'
 
+// Game modes configuration
+export const GAME_MODES = [
+  {
+    id: 'quick' as GameType,
+    name: 'Quick Play',
+    icon: '⚡',
+    description: '10 random questions, no time pressure',
+    multiplier: 1,
+    allowCategorySelect: true,
+    allowDifficultySelect: false,
+  },
+  {
+    id: 'timed' as GameType,
+    name: 'Time Attack',
+    icon: '⏱️',
+    description: '30 seconds per question, beat the clock!',
+    multiplier: 1.5,
+    allowCategorySelect: true,
+    allowDifficultySelect: true,
+  },
+  {
+    id: 'expert' as GameType,
+    name: 'Expert Challenge',
+    icon: '🎯',
+    description: 'Hard questions only, maximum rewards',
+    multiplier: 2,
+    allowCategorySelect: true,
+    allowDifficultySelect: false,
+  },
+  {
+    id: 'survival' as GameType,
+    name: 'Survival Mode',
+    icon: '💀',
+    description: '3 strikes and you\'re out!',
+    multiplier: 2.5,
+    allowCategorySelect: false,
+    allowDifficultySelect: false,
+  },
+]
+
 // Category display information - ALL TriviaCategory values
 export const CATEGORY_INFO: Record<TriviaCategory, { label: string; icon: string; color: string }> = {
   bourbon: { label: 'Bourbon', icon: '🥃', color: 'amber' },
@@ -23,6 +63,9 @@ export const CATEGORY_INFO: Record<TriviaCategory, { label: string; icon: string
   sake: { label: 'Sake', icon: '🍶', color: 'white' },
   brands: { label: 'Brands', icon: '🏷️', color: 'blue' },
 }
+
+// Alias for backward compatibility
+export const CATEGORY_DISPLAY = CATEGORY_INFO
 
 export const DIFFICULTY_INFO: Record<Difficulty, { label: string; multiplier: number; color: string }> = {
   easy: { label: 'Easy', multiplier: 1, color: 'green' },
@@ -78,10 +121,10 @@ export function useTrivia() {
         try {
           wrongAnswers = JSON.parse(question.wrong_answers)
         } catch {
-          wrongAnswers = []
+          wrongAnswers = question.wrong_answers.split(',').map((a: string) => a.trim())
         }
       } else if (Array.isArray(question.wrong_answers)) {
-        wrongAnswers = question.wrong_answers as string[]
+        wrongAnswers = question.wrong_answers
       } else {
         wrongAnswers = []
       }
@@ -142,38 +185,39 @@ export function useTrivia() {
     }
   }, [preprocessQuestions])
 
-  const submitAnswer = useCallback(async (answer: string, responseTimeMs: number) => {
-    const currentQuestion = state.questions[state.currentIndex]
-    if (!currentQuestion) return null
+  const submitAnswer = useCallback((answer: string) => {
+    setState((prev) => {
+      const currentQuestion = prev.questions[prev.currentIndex]
+      if (!currentQuestion) return prev
 
-    const isCorrect = answer === currentQuestion.correct_answer
-    const difficultyMultiplier = DIFFICULTY_INFO[currentQuestion.difficulty]?.multiplier || 1
-    const proofForQuestion = isCorrect ? Math.round((currentQuestion.proof_reward || 10) * difficultyMultiplier) : 0
+      const isCorrect = answer === currentQuestion.correct_answer
+      const proofReward = isCorrect ? (currentQuestion.proof_reward || 10) : 0
 
-    const isLastQuestion = state.currentIndex >= state.questions.length - 1
+      const mode = GAME_MODES.find(m => m.id === prev.gameType)
+      const multipliedProof = Math.round(proofReward * (mode?.multiplier || 1))
 
-    setState(prev => ({
-      ...prev,
-      score: isCorrect ? prev.score + 1 : prev.score,
-      proofEarned: prev.proofEarned + proofForQuestion,
-      answers: [...prev.answers, {
-        questionId: currentQuestion.id,
-        answer,
-        correct: isCorrect,
-        timeMs: responseTimeMs,
-      }],
-      currentIndex: isLastQuestion ? prev.currentIndex : prev.currentIndex + 1,
-      isComplete: isLastQuestion,
-    }))
+      const newAnswers = [
+        ...prev.answers,
+        {
+          questionId: currentQuestion.id,
+          answer,
+          correct: isCorrect,
+          timeMs: Date.now() - (prev.startTime?.getTime() || 0),
+        },
+      ]
 
-    return {
-      correct: isCorrect,
-      correctAnswer: currentQuestion.correct_answer,
-      explanation: currentQuestion.explanation,
-      proofEarned: proofForQuestion,
-      isComplete: isLastQuestion,
-    }
-  }, [state.currentIndex, state.questions])
+      const isLastQuestion = prev.currentIndex >= prev.questions.length - 1
+
+      return {
+        ...prev,
+        score: prev.score + (isCorrect ? 1 : 0),
+        proofEarned: prev.proofEarned + multipliedProof,
+        answers: newAnswers,
+        currentIndex: isLastQuestion ? prev.currentIndex : prev.currentIndex + 1,
+        isComplete: isLastQuestion,
+      }
+    })
+  }, [])
 
   const currentQuestion = useMemo(() => {
     const question = state.questions[state.currentIndex]
@@ -205,14 +249,14 @@ export function useTrivia() {
 
       if (saveError) throw saveError
 
+      // Update user's proof balance if logged in
       if (userId && state.proofEarned > 0) {
-        const { error: updateError } = await supabase.rpc('add_proof', {
+        await supabase.rpc('add_proof', {
           p_user_id: userId,
           p_amount: state.proofEarned,
-          p_transaction_type: 'trivia_reward',
-          p_description: `${state.gameType} game: ${state.score}/${state.questions.length} correct`,
+          p_type: 'earn',
+          p_description: `Trivia game: ${state.score}/${state.questions.length} correct`,
         })
-        if (updateError) console.error('Failed to add proof:', updateError)
       }
 
       return { success: true }
@@ -230,40 +274,35 @@ export function useTrivia() {
     const totalQuestions = state.questions.length
     const correctAnswers = state.score
     const accuracy = totalQuestions > 0 ? Math.round((correctAnswers / totalQuestions) * 100) : 0
-    const avgTimeMs = state.answers.length > 0
-      ? Math.round(state.answers.reduce((sum, a) => sum + a.timeMs, 0) / state.answers.length)
-      : 0
 
     return {
-      total: totalQuestions,
-      score: correctAnswers,
+      totalQuestions,
+      correctAnswers,
       accuracy,
-      avgTimeMs,
       proofEarned: state.proofEarned,
       gameType: state.gameType,
     }
   }, [state])
 
+  const progress = useMemo(() => {
+    if (state.questions.length === 0) return 0
+    return Math.round(((state.currentIndex + 1) / state.questions.length) * 100)
+  }, [state.questions.length, state.currentIndex])
+
   return {
     questions: state.questions,
-    currentQuestion,
     score: state.score,
     proofEarned: state.proofEarned,
     answers: state.answers,
     isComplete: state.isComplete,
     isLoading,
     error,
+    currentQuestion,
     startGame,
     submitAnswer,
     saveGameSession,
     resetGame,
     getGameStats,
-    progress: {
-      current: state.currentIndex + 1,
-      total: state.questions.length,
-      percentage: state.questions.length > 0 
-        ? Math.round(((state.currentIndex + 1) / state.questions.length) * 100) 
-        : 0,
-    },
+    progress,
   }
 }
