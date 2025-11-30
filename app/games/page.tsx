@@ -1,65 +1,10 @@
 'use client'
 
-// app/games/page.tsx
-// BarrelVerse Games Page - REAL Database Integration
-
-export const dynamic = 'force-dynamic'
-
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import Link from 'next/link'
-import { useTrivia, CATEGORY_INFO, DIFFICULTY_INFO } from '@/lib/hooks/use-trivia'
+import { useTrivia, GAME_MODES, CATEGORY_DISPLAY, DIFFICULTY_INFO } from '@/lib/hooks/use-trivia'
 import { useAuth } from '@/lib/hooks/use-auth'
-import type { TriviaCategory, Difficulty, GameType } from '@/lib/types/database'
-
-// Game modes using actual GameType values from database
-const GAME_MODES: {
-  id: GameType
-  name: string
-  description: string
-  icon: string
-  questionCount: number
-  timeLimit: number
-  multiplier: number
-  allowCategorySelect?: boolean
-}[] = [
-  {
-    id: 'quick_pour',
-    name: 'Quick Pour',
-    description: '10 random questions across all categories',
-    icon: '⚡',
-    questionCount: 10,
-    timeLimit: 30,
-    multiplier: 1,
-  },
-  {
-    id: 'masters_challenge',
-    name: 'Masters Challenge',
-    description: '25 challenging questions for experts',
-    icon: '🏆',
-    questionCount: 25,
-    timeLimit: 20,
-    multiplier: 2,
-  },
-  {
-    id: 'daily_dram',
-    name: 'Daily Dram',
-    description: 'Focus on one category of your choice',
-    icon: '🎯',
-    questionCount: 15,
-    timeLimit: 25,
-    multiplier: 1.5,
-    allowCategorySelect: true,
-  },
-  {
-    id: 'speed_round',
-    name: 'Speed Round',
-    description: 'Quick-fire questions with short time limits',
-    icon: '⏱️',
-    questionCount: 10,
-    timeLimit: 15,
-    multiplier: 1.5,
-  },
-]
+import type { GameType, TriviaCategory, Difficulty } from '@/lib/types/database'
 
 export default function GamesPage() {
   const { user, profile, loading: authLoading } = useAuth()
@@ -85,6 +30,10 @@ export default function GamesPage() {
   const [selectedAnswer, setSelectedAnswer] = useState<string | null>(null)
   const [showResult, setShowResult] = useState(false)
   const [timeRemaining, setTimeRemaining] = useState(30)
+  
+  // Use ref to track current question ID to prevent timer issues
+  const currentQuestionIdRef = useRef<string | null>(null)
+  const timerRef = useRef<NodeJS.Timeout | null>(null)
 
   const loading = authLoading || triviaLoading
   const isPlaying = questions.length > 0 && !isComplete
@@ -104,13 +53,41 @@ export default function GamesPage() {
     return maxStreak
   }, [answers])
 
-  // Timer effect
-  useEffect(() => {
-    if (!isPlaying || showResult) return
+  // Handle timeout - memoized to prevent recreating
+  const handleTimeout = useCallback(() => {
+    if (!currentQuestion || showResult) return
+    setShowResult(true)
+    setTimeout(() => {
+      submitAnswer('__TIMEOUT__')
+      setSelectedAnswer(null)
+      setShowResult(false)
+      setTimeRemaining(30)
+    }, 1500)
+  }, [currentQuestion, showResult, submitAnswer])
 
-    const timer = setInterval(() => {
+  // Timer effect - only depends on question ID changing
+  useEffect(() => {
+    // Clear existing timer
+    if (timerRef.current) {
+      clearInterval(timerRef.current)
+      timerRef.current = null
+    }
+
+    if (!isPlaying || showResult || !currentQuestion) return
+
+    // Reset timer when question changes
+    if (currentQuestionIdRef.current !== currentQuestion.id) {
+      currentQuestionIdRef.current = currentQuestion.id
+      setTimeRemaining(30)
+    }
+
+    timerRef.current = setInterval(() => {
       setTimeRemaining((prev) => {
         if (prev <= 1) {
+          if (timerRef.current) {
+            clearInterval(timerRef.current)
+            timerRef.current = null
+          }
           handleTimeout()
           return 0
         }
@@ -118,8 +95,13 @@ export default function GamesPage() {
       })
     }, 1000)
 
-    return () => clearInterval(timer)
-  }, [isPlaying, showResult, currentQuestion])
+    return () => {
+      if (timerRef.current) {
+        clearInterval(timerRef.current)
+        timerRef.current = null
+      }
+    }
+  }, [isPlaying, showResult, currentQuestion?.id, handleTimeout])
 
   const handleStartGame = async () => {
     if (!selectedMode) return
@@ -131,184 +113,232 @@ export default function GamesPage() {
       ? selectedCategory
       : undefined
 
-    await startGame(mode.id, category, selectedDifficulty, mode.questionCount)
-    setTimeRemaining(mode.timeLimit)
-    setSelectedAnswer(null)
-    setShowResult(false)
+    const difficulty = mode.allowDifficultySelect
+      ? selectedDifficulty
+      : undefined
+
+    currentQuestionIdRef.current = null
+    setTimeRemaining(30)
+    await startGame(selectedMode, category as TriviaCategory | undefined, difficulty)
   }
 
-  const handleAnswer = async (answer: string) => {
+  const handleAnswer = useCallback((answer: string) => {
     if (showResult || !currentQuestion) return
-
+    
+    // Stop timer immediately
+    if (timerRef.current) {
+      clearInterval(timerRef.current)
+      timerRef.current = null
+    }
+    
     setSelectedAnswer(answer)
     setShowResult(true)
 
-    const startTime = Date.now()
-    await submitAnswer(answer, Date.now() - startTime)
-
     setTimeout(() => {
+      submitAnswer(answer)
       setSelectedAnswer(null)
       setShowResult(false)
-      const mode = GAME_MODES.find((m) => m.id === selectedMode)
-      setTimeRemaining(mode?.timeLimit || 30)
+      setTimeRemaining(30)
     }, 1500)
-  }
+  }, [showResult, currentQuestion, submitAnswer])
 
-  const handleTimeout = () => {
-    if (!currentQuestion) return
-    handleAnswer('TIMEOUT')
-  }
-
-  const handleEndGame = () => {
+  const handlePlayAgain = () => {
+    currentQuestionIdRef.current = null
     resetGame()
     setSelectedMode(null)
+    setTimeRemaining(30)
   }
 
-  // Mode Selection Screen
-  if (!isPlaying && !selectedMode && !isComplete) {
+  const mode = selectedMode ? GAME_MODES.find((m) => m.id === selectedMode) : null
+  const difficultyInfo = DIFFICULTY_INFO[selectedDifficulty]
+
+  // Mode selection screen
+  if (!isPlaying && !isComplete) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-amber-900 via-amber-800 to-stone-900 text-white">
+      <div className="min-h-screen bg-gradient-to-br from-stone-900 via-amber-950 to-stone-900 text-white">
         <div className="container mx-auto px-4 py-8">
-          <Link href="/" className="inline-flex items-center text-amber-300 hover:text-amber-200 mb-8">
-            ← Back to Home
-          </Link>
+          <div className="flex items-center justify-between mb-8">
+            <Link href="/" className="text-amber-300 hover:text-amber-200">
+              ← Back to Home
+            </Link>
+            {user && profile && (
+              <div className="flex items-center gap-3 bg-stone-800/50 border border-amber-600/30 rounded-lg px-4 py-2">
+                <span className="text-amber-400 font-bold">{profile.proof_balance || 0} $PROOF</span>
+              </div>
+            )}
+          </div>
 
           <div className="text-center mb-12">
             <h1 className="text-4xl font-bold mb-4">🎮 Trivia Games</h1>
-            <p className="text-xl text-amber-200">Test your spirits knowledge and earn $PROOF tokens!</p>
-            {profile && (
-              <p className="text-amber-300 mt-2">
-                Your $PROOF Balance: {profile.proof_balance?.toLocaleString() || 0}
-              </p>
-            )}
+            <p className="text-xl text-amber-200">Test your spirits knowledge and earn $PROOF rewards</p>
           </div>
 
-          <div className="grid md:grid-cols-2 gap-6 max-w-4xl mx-auto">
-            {GAME_MODES.map((mode) => (
-              <button
-                key={mode.id}
-                onClick={() => setSelectedMode(mode.id)}
-                className="bg-stone-800/50 border border-amber-600/30 rounded-xl p-6 text-left hover:border-amber-500 hover:bg-stone-800/70 transition-all group"
-              >
-                <div className="text-4xl mb-4">{mode.icon}</div>
-                <h3 className="text-xl font-bold mb-2 group-hover:text-amber-300">{mode.name}</h3>
-                <p className="text-stone-400 mb-4">{mode.description}</p>
-                <div className="flex gap-4 text-sm text-amber-400">
-                  <span>📝 {mode.questionCount} questions</span>
-                  <span>⏱️ {mode.timeLimit}s</span>
-                  <span>💰 {mode.multiplier}x</span>
-                </div>
-              </button>
-            ))}
-          </div>
-
-          {!user && (
-            <div className="mt-8 text-center">
-              <p className="text-amber-300 mb-4">Sign in to save your progress and earn $PROOF!</p>
-              <Link href="/auth/login" className="inline-block bg-amber-600 hover:bg-amber-700 px-6 py-3 rounded-lg font-semibold transition-colors">
-                Sign In
-              </Link>
+          {error && (
+            <div className="max-w-2xl mx-auto mb-8 p-4 bg-red-900/50 border border-red-500 rounded-lg text-center">
+              {error}
             </div>
           )}
-        </div>
-      </div>
-    )
-  }
 
-  // Game Configuration Screen
-  if (!isPlaying && selectedMode && !isComplete) {
-    const mode = GAME_MODES.find((m) => m.id === selectedMode)
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-amber-900 via-amber-800 to-stone-900 text-white">
-        <div className="container mx-auto px-4 py-8">
-          <button onClick={() => setSelectedMode(null)} className="inline-flex items-center text-amber-300 hover:text-amber-200 mb-8">
-            ← Choose Different Mode
-          </button>
-
-          <div className="max-w-xl mx-auto bg-stone-800/50 border border-amber-600/30 rounded-xl p-8">
-            <div className="text-center mb-8">
-              <div className="text-5xl mb-4">{mode?.icon}</div>
-              <h1 className="text-3xl font-bold mb-2">{mode?.name}</h1>
-              <p className="text-stone-400">{mode?.description}</p>
-            </div>
-
-            {mode?.allowCategorySelect && (
-              <div className="mb-6">
-                <label className="block text-amber-300 mb-2 font-semibold">Select Category</label>
-                <select
-                  value={selectedCategory}
-                  onChange={(e) => setSelectedCategory(e.target.value as TriviaCategory | 'all')}
-                  className="w-full bg-stone-900 border border-amber-600/30 rounded-lg px-4 py-3 text-white focus:border-amber-500 focus:outline-none"
+          {/* Game Modes */}
+          <div className="max-w-4xl mx-auto mb-8">
+            <h2 className="text-xl font-bold mb-4 text-center">Select Game Mode</h2>
+            <div className="grid md:grid-cols-2 gap-4">
+              {GAME_MODES.map((gameMode) => (
+                <button
+                  key={gameMode.id}
+                  onClick={() => setSelectedMode(gameMode.id)}
+                  className={`p-6 rounded-xl border text-left transition-all ${
+                    selectedMode === gameMode.id
+                      ? 'border-amber-500 bg-amber-600/20'
+                      : 'border-stone-600 hover:border-amber-600/50 bg-stone-800/50'
+                  }`}
                 >
-                  <option value="all">All Categories</option>
-                  {Object.entries(CATEGORY_INFO).map(([key, info]) => (
-                    <option key={key} value={key}>{info.icon} {info.label}</option>
-                  ))}
-                </select>
-              </div>
-            )}
-
-            <div className="mb-8">
-              <label className="block text-amber-300 mb-2 font-semibold">Difficulty</label>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                {Object.entries(DIFFICULTY_INFO).map(([key, info]) => (
-                  <button
-                    key={key}
-                    onClick={() => setSelectedDifficulty(key as Difficulty)}
-                    className={`px-4 py-3 rounded-lg border transition-all ${selectedDifficulty === key ? 'bg-amber-600 border-amber-500 text-white' : 'bg-stone-900 border-stone-700 text-stone-300 hover:border-amber-600/50'}`}
-                  >
-                    <div className="font-semibold">{info.label}</div>
-                    <div className="text-xs opacity-75">{info.multiplier}x</div>
-                  </button>
-                ))}
-              </div>
+                  <div className="flex items-start gap-4">
+                    <span className="text-4xl">{gameMode.icon}</span>
+                    <div>
+                      <h3 className="text-lg font-bold">{gameMode.name}</h3>
+                      <p className="text-stone-400 text-sm mb-2">{gameMode.description}</p>
+                      <span className="text-amber-400 text-sm">{gameMode.multiplier}x $PROOF</span>
+                    </div>
+                  </div>
+                </button>
+              ))}
             </div>
+          </div>
 
-            <button
-              onClick={handleStartGame}
-              disabled={loading}
-              className="w-full bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-white font-bold py-4 px-8 rounded-lg text-xl transition-all disabled:opacity-50"
-            >
-              {loading ? 'Loading...' : '🎮 Start Game'}
-            </button>
+          {/* Category & Difficulty Selection */}
+          {selectedMode && mode && (
+            <div className="max-w-2xl mx-auto space-y-6">
+              {mode.allowCategorySelect && (
+                <div>
+                  <h3 className="text-lg font-bold mb-3 text-center">Select Category</h3>
+                  <div className="grid grid-cols-3 md:grid-cols-5 gap-2">
+                    <button
+                      onClick={() => setSelectedCategory('all')}
+                      className={`p-3 rounded-lg border text-sm ${
+                        selectedCategory === 'all'
+                          ? 'border-amber-500 bg-amber-600/20'
+                          : 'border-stone-600 hover:border-amber-600/50'
+                      }`}
+                    >
+                      All
+                    </button>
+                    {Object.entries(CATEGORY_DISPLAY).map(([key, { label, icon }]) => (
+                      <button
+                        key={key}
+                        onClick={() => setSelectedCategory(key as TriviaCategory)}
+                        className={`p-3 rounded-lg border text-sm ${
+                          selectedCategory === key
+                            ? 'border-amber-500 bg-amber-600/20'
+                            : 'border-stone-600 hover:border-amber-600/50'
+                        }`}
+                      >
+                        {icon} {label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {mode.allowDifficultySelect && (
+                <div>
+                  <h3 className="text-lg font-bold mb-3 text-center">Select Difficulty</h3>
+                  <div className="grid grid-cols-4 gap-2">
+                    {Object.entries(DIFFICULTY_INFO).map(([key, info]) => (
+                      <button
+                        key={key}
+                        onClick={() => setSelectedDifficulty(key as Difficulty)}
+                        className={`p-3 rounded-lg border text-sm ${
+                          selectedDifficulty === key
+                            ? 'border-amber-500 bg-amber-600/20'
+                            : 'border-stone-600 hover:border-amber-600/50'
+                        }`}
+                      >
+                        {info.label}
+                        <span className="block text-amber-400 text-xs">{info.multiplier}x</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              <button
+                onClick={handleStartGame}
+                disabled={loading}
+                className="w-full py-4 bg-amber-600 hover:bg-amber-700 disabled:bg-stone-600 rounded-xl font-bold text-lg transition-colors"
+              >
+                {loading ? 'Loading...' : '🎮 Start Game'}
+              </button>
+            </div>
+          )}
+
+          {/* How to Play */}
+          <div className="max-w-2xl mx-auto mt-16 bg-stone-800/50 border border-amber-600/30 rounded-xl p-6">
+            <h2 className="text-xl font-bold mb-4">How to Earn $PROOF</h2>
+            <ul className="space-y-2 text-stone-300">
+              <li>✓ Answer questions correctly to earn $PROOF tokens</li>
+              <li>✓ Harder difficulties = more rewards</li>
+              <li>✓ Build streaks for bonus points</li>
+              <li>✓ Redeem $PROOF for real merchandise at the <Link href="/rewards" className="text-amber-400 hover:underline">Rewards Shop</Link></li>
+            </ul>
           </div>
         </div>
       </div>
     )
   }
 
-  // Game Results Screen
+  // Game complete screen
   if (isComplete) {
     const stats = getGameStats()
+
     return (
-      <div className="min-h-screen bg-gradient-to-br from-amber-900 via-amber-800 to-stone-900 text-white">
+      <div className="min-h-screen bg-gradient-to-br from-stone-900 via-amber-950 to-stone-900 text-white">
         <div className="container mx-auto px-4 py-8">
-          <div className="max-w-xl mx-auto bg-stone-800/50 border border-amber-600/30 rounded-xl p-8 text-center">
-            <div className="text-6xl mb-6">🎉</div>
-            <h1 className="text-3xl font-bold mb-4">Game Complete!</h1>
-            
-            <div className="grid grid-cols-2 gap-4 mb-8">
-              <div className="bg-stone-900/50 rounded-lg p-4">
-                <div className="text-3xl font-bold text-amber-400">{stats.score}/{stats.total}</div>
-                <div className="text-stone-400">Correct</div>
-              </div>
-              <div className="bg-stone-900/50 rounded-lg p-4">
-                <div className="text-3xl font-bold text-amber-400">{stats.accuracy}%</div>
-                <div className="text-stone-400">Accuracy</div>
-              </div>
-              <div className="bg-stone-900/50 rounded-lg p-4">
-                <div className="text-3xl font-bold text-orange-400">{streak}🔥</div>
-                <div className="text-stone-400">Best Streak</div>
-              </div>
-              <div className="bg-stone-900/50 rounded-lg p-4">
-                <div className="text-3xl font-bold text-green-400">+{stats.proofEarned}</div>
-                <div className="text-stone-400">$PROOF Earned</div>
+          <div className="max-w-2xl mx-auto text-center">
+            <div className="text-6xl mb-4">🎉</div>
+            <h1 className="text-3xl font-bold mb-2">Game Complete!</h1>
+            <p className="text-xl text-amber-200 mb-8">Great job testing your spirits knowledge</p>
+
+            <div className="bg-stone-800/50 border border-amber-600/30 rounded-xl p-8 mb-8">
+              <div className="grid grid-cols-2 gap-6">
+                <div>
+                  <p className="text-stone-400 text-sm">Score</p>
+                  <p className="text-3xl font-bold">{score}/{questions.length}</p>
+                </div>
+                <div>
+                  <p className="text-stone-400 text-sm">$PROOF Earned</p>
+                  <p className="text-3xl font-bold text-amber-400">+{proofEarned}</p>
+                </div>
+                <div>
+                  <p className="text-stone-400 text-sm">Accuracy</p>
+                  <p className="text-3xl font-bold">{stats.accuracy}%</p>
+                </div>
+                <div>
+                  <p className="text-stone-400 text-sm">Best Streak</p>
+                  <p className="text-3xl font-bold">{streak}🔥</p>
+                </div>
               </div>
             </div>
 
-            <div className="flex gap-4">
-              <button onClick={handleStartGame} className="flex-1 bg-amber-600 hover:bg-amber-700 py-3 px-6 rounded-lg font-semibold transition-colors">Play Again</button>
-              <button onClick={handleEndGame} className="flex-1 bg-stone-700 hover:bg-stone-600 py-3 px-6 rounded-lg font-semibold transition-colors">Choose Mode</button>
+            <div className="flex flex-col sm:flex-row gap-4 justify-center">
+              <button
+                onClick={handlePlayAgain}
+                className="px-8 py-3 bg-amber-600 hover:bg-amber-700 rounded-lg font-semibold"
+              >
+                Play Again
+              </button>
+              <Link
+                href="/leaderboard"
+                className="px-8 py-3 border border-amber-600 hover:bg-amber-600/10 rounded-lg font-semibold"
+              >
+                View Leaderboard
+              </Link>
+              <Link
+                href="/rewards"
+                className="px-8 py-3 border border-stone-600 hover:bg-stone-800 rounded-lg font-semibold"
+              >
+                Spend $PROOF
+              </Link>
             </div>
           </div>
         </div>
@@ -316,53 +346,49 @@ export default function GamesPage() {
     )
   }
 
-  // Loading State
+  // Active game screen
   if (!currentQuestion) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-amber-900 via-amber-800 to-stone-900 text-white flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin text-5xl mb-4">🥃</div>
-          <p className="text-xl">Loading questions...</p>
-        </div>
+      <div className="min-h-screen bg-gradient-to-br from-stone-900 via-amber-950 to-stone-900 text-white flex items-center justify-center">
+        <div className="animate-spin text-5xl">🥃</div>
       </div>
     )
   }
 
-  // Active Game Screen
-  const mode = GAME_MODES.find((m) => m.id === selectedMode)
-  const categoryInfo = CATEGORY_INFO[currentQuestion.category]
-  const difficultyInfo = DIFFICULTY_INFO[currentQuestion.difficulty]
-
   return (
-    <div className="min-h-screen bg-gradient-to-br from-amber-900 via-amber-800 to-stone-900 text-white">
+    <div className="min-h-screen bg-gradient-to-br from-stone-900 via-amber-950 to-stone-900 text-white">
       <div className="container mx-auto px-4 py-8">
-        <div className="flex justify-between items-center mb-6">
+        {/* Header */}
+        <div className="flex items-center justify-between mb-8">
           <div className="flex items-center gap-4">
-            <span className="text-amber-300">Question {progress.current}/{progress.total}</span>
-            <span className="bg-stone-800 px-3 py-1 rounded-full text-sm">{categoryInfo?.icon} {categoryInfo?.label}</span>
+            <span className="text-stone-400">
+              Question {currentQuestion.questionNumber} of {currentQuestion.totalQuestions}
+            </span>
+            <span className="text-amber-400 font-bold">{score} correct</span>
           </div>
-          <button onClick={handleEndGame} className="text-stone-400 hover:text-white transition-colors">End Game</button>
-        </div>
-
-        <div className="w-full h-2 bg-stone-800 rounded-full mb-8">
-          <div className="h-full bg-gradient-to-r from-amber-500 to-amber-400 rounded-full transition-all" style={{ width: `${progress.percentage}%` }} />
-        </div>
-
-        <div className="flex justify-center gap-8 mb-8">
-          <div className="text-center">
-            <div className="text-2xl font-bold text-amber-400">{score}</div>
-            <div className="text-stone-400 text-sm">Score</div>
-          </div>
-          <div className="text-center">
-            <div className="text-2xl font-bold text-orange-400">{streak}🔥</div>
-            <div className="text-stone-400 text-sm">Streak</div>
-          </div>
-          <div className="text-center">
-            <div className={`text-2xl font-bold ${timeRemaining <= 10 ? 'text-red-400 animate-pulse' : 'text-white'}`}>{timeRemaining}s</div>
-            <div className="text-stone-400 text-sm">Time</div>
+          <div className="flex items-center gap-3">
+            <div className={`px-4 py-2 rounded-lg font-bold ${
+              timeRemaining <= 10 ? 'bg-red-600 animate-pulse' : 'bg-stone-800'
+            }`}>
+              ⏱️ {timeRemaining}s
+            </div>
+            <div className="bg-stone-800 px-4 py-2 rounded-lg">
+              <span className="text-amber-400 font-bold">{proofEarned} $PROOF</span>
+            </div>
           </div>
         </div>
 
+        {/* Progress Bar */}
+        <div className="mb-8">
+          <div className="h-2 bg-stone-800 rounded-full overflow-hidden">
+            <div
+              className="h-full bg-gradient-to-r from-amber-600 to-amber-400 transition-all duration-300"
+              style={{ width: `${(currentQuestion.questionNumber / currentQuestion.totalQuestions) * 100}%` }}
+            />
+          </div>
+        </div>
+
+        {/* Question */}
         <div className="max-w-2xl mx-auto">
           <div className="bg-stone-800/50 border border-amber-600/30 rounded-xl p-8 mb-6">
             <div className="flex justify-between items-start mb-4">
@@ -372,6 +398,7 @@ export default function GamesPage() {
             <h2 className="text-xl font-semibold">{currentQuestion.question}</h2>
           </div>
 
+          {/* Answer Options - FIXED: Use question ID + option as key */}
           <div className="grid gap-3">
             {currentQuestion.shuffledAnswers.map((option, index) => {
               const isSelected = selectedAnswer === option
@@ -381,10 +408,15 @@ export default function GamesPage() {
 
               return (
                 <button
-                  key={index}
+                  key={`${currentQuestion.id}-${index}`}
                   onClick={() => handleAnswer(option)}
                   disabled={showResult}
-                  className={`w-full text-left p-4 rounded-lg border transition-all ${showCorrect ? 'bg-green-600/30 border-green-500 text-green-100' : showWrong ? 'bg-red-600/30 border-red-500 text-red-100' : isSelected ? 'bg-amber-600/30 border-amber-500' : 'bg-stone-900/50 border-stone-700 hover:border-amber-600/50 hover:bg-stone-800/50'} ${showResult ? 'cursor-default' : 'cursor-pointer'}`}
+                  className={`w-full text-left p-4 rounded-lg border transition-all ${
+                    showCorrect ? 'bg-green-600/30 border-green-500 text-green-100' :
+                    showWrong ? 'bg-red-600/30 border-red-500 text-red-100' :
+                    isSelected ? 'bg-amber-600/30 border-amber-500' :
+                    'bg-stone-900/50 border-stone-700 hover:border-amber-600/50 hover:bg-stone-800/50'
+                  } ${showResult ? 'cursor-default' : 'cursor-pointer'}`}
                 >
                   <span className="font-semibold mr-3 text-amber-400">{String.fromCharCode(65 + index)}.</span>
                   {option}
