@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import Link from 'next/link'
-import { useTrivia, GAME_MODES, CATEGORY_DISPLAY, DIFFICULTY_INFO } from '@/lib/hooks/use-trivia'
+import { useTrivia, GAME_MODES, CATEGORY_INFO, DIFFICULTY_INFO } from '@/lib/hooks/use-trivia'
 import { useAuth } from '@/lib/hooks/use-auth'
 import type { GameType, TriviaCategory, Difficulty } from '@/lib/types/database'
 
@@ -223,7 +223,7 @@ export default function GamesPage() {
                     >
                       All
                     </button>
-                    {Object.entries(CATEGORY_DISPLAY).map(([key, { label, icon }]) => (
+                    {Object.entries(CATEGORY_INFO).map(([key, { label, icon }]) => (
                       <button
                         key={key}
                         onClick={() => setSelectedCategory(key as TriviaCategory)}
