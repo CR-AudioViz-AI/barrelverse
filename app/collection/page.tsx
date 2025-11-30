@@ -1,17 +1,14 @@
 'use client'
 
-// app/collection/page.tsx
-// BarrelVerse Collection Page - REAL Database Integration
-
 export const dynamic = 'force-dynamic'
 
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect, Suspense } from 'react'
 import Link from 'next/link'
+import { useSearchParams } from 'next/navigation'
 import { useCollection, CATEGORY_DISPLAY, RARITY_DISPLAY } from '@/lib/hooks/use-collection'
 import { useAuth } from '@/lib/hooks/use-auth'
 import type { SpiritCategory, Rarity } from '@/lib/types/database'
 
-// Sort options
 const SORT_OPTIONS = [
   { value: 'name', label: 'Name' },
   { value: 'proof', label: 'Proof' },
@@ -19,7 +16,6 @@ const SORT_OPTIONS = [
   { value: 'rarity', label: 'Rarity' },
 ]
 
-// Helper to safely get tasting notes as array
 function getTastingNotes(spirit: { tasting_notes: unknown }): string[] {
   if (!spirit.tasting_notes) return []
   if (Array.isArray(spirit.tasting_notes)) return spirit.tasting_notes as string[]
@@ -30,7 +26,8 @@ function getTastingNotes(spirit: { tasting_notes: unknown }): string[] {
   return []
 }
 
-export default function CollectionPage() {
+function CollectionContent() {
+  const searchParams = useSearchParams()
   const { user, profile, loading: authLoading } = useAuth()
   const {
     items: collectionItems,
@@ -43,48 +40,53 @@ export default function CollectionPage() {
     removeFromCollection,
   } = useCollection(user?.id)
 
-  const [selectedCategory, setSelectedCategory] = useState<SpiritCategory | 'all'>('all')
+  // Initialize from URL params
+  const initialCategory = searchParams?.get('category') as SpiritCategory | null
+  const [selectedCategory, setSelectedCategory] = useState<SpiritCategory | 'all'>(initialCategory || 'all')
   const [selectedRarity, setSelectedRarity] = useState<Rarity | 'all'>('all')
   const [sortBy, setSortBy] = useState('name')
   const [searchQuery, setSearchQuery] = useState('')
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid')
   const [showOnlyOwned, setShowOnlyOwned] = useState(false)
 
+  // Update category when URL changes
+  useEffect(() => {
+    const urlCategory = searchParams?.get('category') as SpiritCategory | null
+    if (urlCategory && Object.keys(CATEGORY_DISPLAY).includes(urlCategory)) {
+      setSelectedCategory(urlCategory)
+    }
+  }, [searchParams])
+
   const loading = authLoading || collectionLoading
 
-  // Get collected spirit IDs for quick lookup
   const collectedSpiritIds = useMemo(() => {
     return new Set(collectionItems.map(item => item.spirit_id))
   }, [collectionItems])
 
   const isInCollection = (spiritId: string) => collectedSpiritIds.has(spiritId)
 
-  // Filter and sort spirits
   const filteredSpirits = useMemo(() => {
     let result = [...spirits]
 
-    // Category filter
     if (selectedCategory !== 'all') {
       result = result.filter(spirit => spirit.category === selectedCategory)
     }
 
-    // Rarity filter
     if (selectedRarity !== 'all') {
       result = result.filter(spirit => spirit.rarity === selectedRarity)
     }
 
-    // Owned filter
     if (showOnlyOwned) {
       result = result.filter(spirit => isInCollection(spirit.id))
     }
 
-    // Search filter
     if (searchQuery) {
       const query = searchQuery.toLowerCase()
       result = result.filter(spirit => {
         const notes = getTastingNotes(spirit)
         return (
           spirit.name.toLowerCase().includes(query) ||
+          spirit.brand?.toLowerCase().includes(query) ||
           spirit.distillery?.toLowerCase().includes(query) ||
           spirit.region?.toLowerCase().includes(query) ||
           notes.some(note => note.toLowerCase().includes(query))
@@ -92,286 +94,241 @@ export default function CollectionPage() {
       })
     }
 
-    // Sort
     result.sort((a, b) => {
       switch (sortBy) {
         case 'proof':
           return (b.proof || 0) - (a.proof || 0)
         case 'age':
-          const ageA = parseInt(a.age_statement || '0') || 0
-          const ageB = parseInt(b.age_statement || '0') || 0
+          const ageA = parseInt(a.age_statement || '0')
+          const ageB = parseInt(b.age_statement || '0')
           return ageB - ageA
         case 'rarity':
-          const rarityOrder = ['common', 'uncommon', 'rare', 'very_rare', 'ultra_rare', 'legendary']
-          return rarityOrder.indexOf(b.rarity) - rarityOrder.indexOf(a.rarity)
+          const rarityOrder = ['legendary', 'ultra_rare', 'very_rare', 'rare', 'uncommon', 'common']
+          return rarityOrder.indexOf(a.rarity || 'common') - rarityOrder.indexOf(b.rarity || 'common')
         default:
           return a.name.localeCompare(b.name)
       }
     })
 
     return result
-  }, [spirits, selectedCategory, selectedRarity, showOnlyOwned, searchQuery, sortBy, collectedSpiritIds])
+  }, [spirits, selectedCategory, selectedRarity, sortBy, searchQuery, showOnlyOwned, collectionItems])
 
-  const handleCollectionToggle = async (spiritId: string) => {
-    if (!user) return
-    
-    if (isInCollection(spiritId)) {
-      const item = collectionItems.find(i => i.spirit_id === spiritId)
-      if (item) {
-        await removeFromCollection(item.id)
-      }
-    } else {
-      await addToCollection(spiritId)
-    }
+  const handleSearch = (e: React.FormEvent) => {
+    e.preventDefault()
+    // Search is already reactive via searchQuery state
   }
 
-  // Calculate completion percentage
-  const completionPercentage = spirits.length > 0 
-    ? Math.round((collectionItems.length / spirits.length) * 100) 
-    : 0
-
   return (
-    <div className="min-h-screen bg-gradient-to-br from-amber-900 via-amber-800 to-stone-900 text-white">
+    <div className="min-h-screen bg-gradient-to-br from-stone-900 via-amber-950 to-stone-900 text-white">
       <div className="container mx-auto px-4 py-8">
         {/* Header */}
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
           <div>
-            <Link href="/" className="inline-flex items-center text-amber-300 hover:text-amber-200 mb-4">
+            <Link href="/" className="text-amber-300 hover:text-amber-200 text-sm">
               ← Back to Home
             </Link>
-            <h1 className="text-4xl font-bold">🥃 Spirit Collection</h1>
-            <p className="text-amber-200 mt-2">
-              Discover and collect the world&apos;s finest spirits
-            </p>
+            <h1 className="text-3xl font-bold mt-2">🥃 Spirit Collection</h1>
+            <p className="text-amber-200">Browse {spirits.length} premium spirits</p>
           </div>
-
-          {/* Collection Stats */}
-          {user && (
-            <div className="flex gap-4 bg-stone-800/50 border border-amber-600/30 rounded-xl p-4">
-              <div className="text-center px-4">
-                <div className="text-2xl font-bold text-amber-400">{stats.uniqueSpirits}</div>
-                <div className="text-xs text-stone-400">Collected</div>
-              </div>
-              <div className="text-center px-4 border-l border-stone-700">
-                <div className="text-2xl font-bold text-white">{spirits.length}</div>
-                <div className="text-xs text-stone-400">Total</div>
-              </div>
-              <div className="text-center px-4 border-l border-stone-700">
-                <div className="text-2xl font-bold text-green-400">{completionPercentage}%</div>
-                <div className="text-xs text-stone-400">Complete</div>
+          {user && stats && (
+            <div className="flex gap-4 text-sm">
+              <div className="bg-stone-800/50 rounded-lg px-4 py-2">
+                <span className="text-amber-400 font-bold">{stats.totalSpirits}</span>
+                <span className="text-stone-400 ml-1">Collected</span>
               </div>
             </div>
           )}
         </div>
 
-        {/* Filters */}
-        <div className="bg-stone-800/50 border border-amber-600/30 rounded-xl p-6 mb-8">
-          <div className="grid md:grid-cols-2 lg:grid-cols-5 gap-4">
-            {/* Search */}
-            <div className="lg:col-span-2">
-              <label className="block text-amber-300 text-sm mb-1">Search</label>
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search by name, distillery, region..."
-                className="w-full bg-stone-900 border border-amber-600/30 rounded-lg px-4 py-2 text-white placeholder-stone-500 focus:border-amber-500 focus:outline-none"
-              />
-            </div>
+        {/* Search & Filters */}
+        <div className="bg-stone-800/50 border border-amber-600/30 rounded-xl p-4 mb-8">
+          {/* Search Bar */}
+          <form onSubmit={handleSearch} className="flex gap-2 mb-4">
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search by name, distillery, region, or tasting notes..."
+              className="flex-1 px-4 py-3 bg-stone-900 border border-stone-700 rounded-lg focus:border-amber-500 focus:outline-none text-white placeholder-stone-500"
+            />
+            <button
+              type="submit"
+              className="px-6 py-3 bg-amber-600 hover:bg-amber-700 rounded-lg font-semibold transition-colors"
+            >
+              Search
+            </button>
+          </form>
 
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             {/* Category Filter */}
             <div>
-              <label className="block text-amber-300 text-sm mb-1">Category</label>
+              <label className="block text-sm text-stone-400 mb-1">Category</label>
               <select
                 value={selectedCategory}
                 onChange={(e) => setSelectedCategory(e.target.value as SpiritCategory | 'all')}
-                className="w-full bg-stone-900 border border-amber-600/30 rounded-lg px-4 py-2 text-white focus:border-amber-500 focus:outline-none"
+                className="w-full bg-stone-900 border border-stone-700 rounded-lg px-3 py-2 text-white focus:border-amber-500 focus:outline-none"
               >
                 <option value="all">All Categories</option>
                 {Object.entries(CATEGORY_DISPLAY).map(([key, info]) => (
-                  <option key={key} value={key}>
-                    {info.icon} {info.label}
-                  </option>
+                  <option key={key} value={key}>{info.icon} {info.label}</option>
                 ))}
               </select>
             </div>
 
             {/* Rarity Filter */}
             <div>
-              <label className="block text-amber-300 text-sm mb-1">Rarity</label>
+              <label className="block text-sm text-stone-400 mb-1">Rarity</label>
               <select
                 value={selectedRarity}
                 onChange={(e) => setSelectedRarity(e.target.value as Rarity | 'all')}
-                className="w-full bg-stone-900 border border-amber-600/30 rounded-lg px-4 py-2 text-white focus:border-amber-500 focus:outline-none"
+                className="w-full bg-stone-900 border border-stone-700 rounded-lg px-3 py-2 text-white focus:border-amber-500 focus:outline-none"
               >
                 <option value="all">All Rarities</option>
                 {Object.entries(RARITY_DISPLAY).map(([key, info]) => (
-                  <option key={key} value={key}>
-                    {info.label}
-                  </option>
+                  <option key={key} value={key}>{info.label}</option>
                 ))}
               </select>
             </div>
 
             {/* Sort */}
             <div>
-              <label className="block text-amber-300 text-sm mb-1">Sort By</label>
+              <label className="block text-sm text-stone-400 mb-1">Sort By</label>
               <select
                 value={sortBy}
                 onChange={(e) => setSortBy(e.target.value)}
-                className="w-full bg-stone-900 border border-amber-600/30 rounded-lg px-4 py-2 text-white focus:border-amber-500 focus:outline-none"
+                className="w-full bg-stone-900 border border-stone-700 rounded-lg px-3 py-2 text-white focus:border-amber-500 focus:outline-none"
               >
-                {SORT_OPTIONS.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
+                {SORT_OPTIONS.map(opt => (
+                  <option key={opt.value} value={opt.value}>{opt.label}</option>
                 ))}
               </select>
             </div>
+
+            {/* View Toggle */}
+            <div>
+              <label className="block text-sm text-stone-400 mb-1">View</label>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setViewMode('grid')}
+                  className={`flex-1 py-2 rounded-lg text-sm ${viewMode === 'grid' ? 'bg-amber-600' : 'bg-stone-700 hover:bg-stone-600'}`}
+                >
+                  Grid
+                </button>
+                <button
+                  onClick={() => setViewMode('list')}
+                  className={`flex-1 py-2 rounded-lg text-sm ${viewMode === 'list' ? 'bg-amber-600' : 'bg-stone-700 hover:bg-stone-600'}`}
+                >
+                  List
+                </button>
+              </div>
+            </div>
           </div>
 
-          {/* Additional Controls */}
-          <div className="flex flex-wrap items-center gap-4 mt-4 pt-4 border-t border-stone-700">
-            {user && (
-              <label className="flex items-center gap-2 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={showOnlyOwned}
-                  onChange={(e) => setShowOnlyOwned(e.target.checked)}
-                  className="w-4 h-4 rounded bg-stone-900 border-amber-600/30 text-amber-500 focus:ring-amber-500"
-                />
-                <span className="text-stone-300">Show only collected</span>
-              </label>
-            )}
-            <div className="flex gap-2 ml-auto">
-              <button
-                onClick={() => setViewMode('grid')}
-                className={`px-3 py-1 rounded ${viewMode === 'grid' ? 'bg-amber-600 text-white' : 'bg-stone-700 text-stone-300'}`}
-              >
-                Grid
-              </button>
-              <button
-                onClick={() => setViewMode('list')}
-                className={`px-3 py-1 rounded ${viewMode === 'list' ? 'bg-amber-600 text-white' : 'bg-stone-700 text-stone-300'}`}
-              >
-                List
-              </button>
+          {/* Active Filters */}
+          {(selectedCategory !== 'all' || searchQuery) && (
+            <div className="flex items-center gap-2 mt-4 pt-4 border-t border-stone-700">
+              <span className="text-sm text-stone-400">Active filters:</span>
+              {selectedCategory !== 'all' && (
+                <button
+                  onClick={() => setSelectedCategory('all')}
+                  className="px-2 py-1 bg-amber-600/20 border border-amber-600/50 rounded text-amber-400 text-sm flex items-center gap-1"
+                >
+                  {CATEGORY_DISPLAY[selectedCategory]?.label} ×
+                </button>
+              )}
+              {searchQuery && (
+                <button
+                  onClick={() => setSearchQuery('')}
+                  className="px-2 py-1 bg-amber-600/20 border border-amber-600/50 rounded text-amber-400 text-sm flex items-center gap-1"
+                >
+                  "{searchQuery}" ×
+                </button>
+              )}
             </div>
-            <span className="text-stone-400 text-sm">
-              {filteredSpirits.length} spirits
-            </span>
-          </div>
+          )}
         </div>
 
-        {/* Loading State */}
+        {/* Results Count */}
+        <p className="text-stone-400 mb-4">
+          Showing {filteredSpirits.length} spirit{filteredSpirits.length !== 1 ? 's' : ''}
+        </p>
+
+        {/* Loading */}
         {loading && (
           <div className="text-center py-12">
             <div className="animate-spin text-5xl mb-4">🥃</div>
-            <p className="text-xl text-amber-200">Loading spirits...</p>
+            <p>Loading spirits...</p>
           </div>
         )}
 
-        {/* Error State */}
+        {/* Error */}
         {error && (
-          <div className="bg-red-900/30 border border-red-600 rounded-xl p-6 mb-8 text-center">
-            <p className="text-red-300 mb-4">{error.message}</p>
-            <button
-              onClick={() => fetchSpirits()}
-              className="bg-red-600 hover:bg-red-700 px-4 py-2 rounded-lg transition-colors"
-            >
-              Retry
-            </button>
-          </div>
-        )}
-
-        {/* Empty State */}
-        {!loading && filteredSpirits.length === 0 && (
-          <div className="text-center py-12">
-            <div className="text-5xl mb-4">🔍</div>
-            <h3 className="text-xl font-bold mb-2">No spirits found</h3>
-            <p className="text-stone-400">Try adjusting your filters or search query</p>
+          <div className="bg-red-900/30 border border-red-500/50 rounded-lg p-4 mb-8">
+            <p className="text-red-200">{error}</p>
           </div>
         )}
 
         {/* Grid View */}
-        {viewMode === 'grid' && !loading && (
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+        {!loading && viewMode === 'grid' && (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
             {filteredSpirits.map((spirit) => {
-              const owned = isInCollection(spirit.id)
-              const rarityInfo = RARITY_DISPLAY[spirit.rarity]
               const categoryInfo = CATEGORY_DISPLAY[spirit.category]
+              const rarityInfo = RARITY_DISPLAY[spirit.rarity || 'common']
               const notes = getTastingNotes(spirit)
+              const inCollection = isInCollection(spirit.id)
 
               return (
                 <div
                   key={spirit.id}
-                  className={`bg-stone-800/50 border rounded-xl overflow-hidden transition-all hover:scale-105 ${
-                    owned ? 'border-amber-500' : 'border-stone-700'
-                  }`}
+                  className={`bg-stone-800/50 border rounded-xl overflow-hidden hover:border-amber-500/50 transition-all ${inCollection ? 'border-green-500/50' : 'border-amber-600/30'}`}
                 >
-                  {/* Image Placeholder */}
-                  <div className="h-48 bg-gradient-to-br from-stone-700 to-stone-800 flex items-center justify-center relative">
+                  {/* Image placeholder */}
+                  <div className="h-40 bg-gradient-to-br from-stone-700 to-stone-800 flex items-center justify-center">
                     <span className="text-6xl">{categoryInfo?.icon || '🥃'}</span>
-                    {owned && (
-                      <div className="absolute top-2 right-2 bg-amber-500 text-white px-2 py-1 rounded text-xs font-bold">
-                        ✓ OWNED
-                      </div>
-                    )}
-                    <div className={`absolute bottom-2 left-2 px-2 py-1 rounded text-xs font-bold text-white ${rarityInfo?.bgClass || 'bg-stone-600'}`}>
-                      {rarityInfo?.label}
-                    </div>
                   </div>
-
-                  {/* Details */}
+                  
                   <div className="p-4">
-                    <h3 className="font-bold text-lg mb-1 truncate">{spirit.name}</h3>
-                    <p className="text-stone-400 text-sm mb-2">{spirit.distillery || spirit.brand}</p>
-                    
-                    <div className="flex flex-wrap gap-2 mb-3 text-xs">
-                      {spirit.proof && (
-                        <span className="bg-stone-700 px-2 py-1 rounded">{spirit.proof}° Proof</span>
-                      )}
-                      {spirit.age_statement && (
-                        <span className="bg-stone-700 px-2 py-1 rounded">{spirit.age_statement}</span>
-                      )}
-                      {spirit.region && (
-                        <span className="bg-stone-700 px-2 py-1 rounded">{spirit.region}</span>
+                    {/* Badges */}
+                    <div className="flex gap-2 mb-2">
+                      <span className={`px-2 py-0.5 rounded text-xs ${rarityInfo?.bgColor || 'bg-stone-600'} ${rarityInfo?.textColor || 'text-white'}`}>
+                        {rarityInfo?.label}
+                      </span>
+                      {inCollection && (
+                        <span className="px-2 py-0.5 rounded text-xs bg-green-600 text-white">
+                          ✓ Owned
+                        </span>
                       )}
                     </div>
 
-                    {/* Tasting Notes */}
+                    <h3 className="font-bold text-lg mb-1 line-clamp-1">{spirit.name}</h3>
+                    <p className="text-stone-400 text-sm mb-2">{spirit.brand}</p>
+                    
+                    <div className="flex gap-3 text-sm text-stone-400 mb-3">
+                      {spirit.proof && <span>{spirit.proof}° proof</span>}
+                      {spirit.age_statement && <span>{spirit.age_statement}</span>}
+                    </div>
+
                     {notes.length > 0 && (
                       <div className="flex flex-wrap gap-1 mb-3">
-                        {notes.slice(0, 3).map((note, idx) => (
-                          <span key={idx} className="text-xs bg-amber-600/20 text-amber-300 px-2 py-0.5 rounded">
+                        {notes.slice(0, 3).map((note, i) => (
+                          <span key={i} className="px-2 py-0.5 bg-stone-700 rounded text-xs text-stone-300">
                             {note}
                           </span>
                         ))}
-                        {notes.length > 3 && (
-                          <span className="text-xs text-stone-500">+{notes.length - 3}</span>
-                        )}
                       </div>
                     )}
 
-                    {/* Collection Button */}
-                    {user ? (
+                    {user && (
                       <button
-                        onClick={() => handleCollectionToggle(spirit.id)}
-                        className={`w-full py-2 rounded-lg font-semibold transition-colors ${
-                          owned
-                            ? 'bg-stone-700 hover:bg-red-600/50 text-stone-300 hover:text-white'
+                        onClick={() => inCollection ? removeFromCollection(spirit.id) : addToCollection(spirit.id)}
+                        className={`w-full py-2 rounded-lg text-sm font-semibold transition-colors ${
+                          inCollection
+                            ? 'bg-stone-700 hover:bg-red-600/50 text-stone-300'
                             : 'bg-amber-600 hover:bg-amber-700 text-white'
                         }`}
                       >
-                        {owned ? 'Remove' : 'Add to Collection'}
+                        {inCollection ? 'Remove from Collection' : '+ Add to Collection'}
                       </button>
-                    ) : (
-                      <Link
-                        href="/auth/login"
-                        className="block w-full py-2 rounded-lg font-semibold text-center bg-stone-700 hover:bg-stone-600 text-stone-300 transition-colors"
-                      >
-                        Sign in to Collect
-                      </Link>
                     )}
                   </div>
                 </div>
@@ -381,56 +338,51 @@ export default function CollectionPage() {
         )}
 
         {/* List View */}
-        {viewMode === 'list' && !loading && (
-          <div className="space-y-4">
+        {!loading && viewMode === 'list' && (
+          <div className="space-y-3">
             {filteredSpirits.map((spirit) => {
-              const owned = isInCollection(spirit.id)
-              const rarityInfo = RARITY_DISPLAY[spirit.rarity]
               const categoryInfo = CATEGORY_DISPLAY[spirit.category]
+              const rarityInfo = RARITY_DISPLAY[spirit.rarity || 'common']
+              const notes = getTastingNotes(spirit)
+              const inCollection = isInCollection(spirit.id)
 
               return (
                 <div
                   key={spirit.id}
-                  className={`bg-stone-800/50 border rounded-xl p-4 flex items-center gap-4 transition-all ${
-                    owned ? 'border-amber-500' : 'border-stone-700'
-                  }`}
+                  className={`bg-stone-800/50 border rounded-xl p-4 flex items-center gap-4 hover:border-amber-500/50 transition-all ${inCollection ? 'border-green-500/50' : 'border-amber-600/30'}`}
                 >
-                  {/* Icon */}
-                  <div className="w-16 h-16 rounded-lg bg-gradient-to-br from-stone-700 to-stone-800 flex items-center justify-center shrink-0">
-                    <span className="text-3xl">{categoryInfo?.icon || '🥃'}</span>
+                  <div className="w-16 h-16 bg-stone-700 rounded-lg flex items-center justify-center text-3xl shrink-0">
+                    {categoryInfo?.icon || '🥃'}
                   </div>
-
-                  {/* Details */}
+                  
                   <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 mb-1">
                       <h3 className="font-bold truncate">{spirit.name}</h3>
-                      {owned && (
-                        <span className="bg-amber-500 text-white px-2 py-0.5 rounded text-xs font-bold shrink-0">
-                          ✓
-                        </span>
-                      )}
-                    </div>
-                    <p className="text-stone-400 text-sm">{spirit.distillery || spirit.brand}</p>
-                    <div className="flex flex-wrap gap-2 mt-1 text-xs">
-                      <span className={`px-2 py-0.5 rounded text-white ${rarityInfo?.bgClass || 'bg-stone-600'}`}>
+                      <span className={`px-2 py-0.5 rounded text-xs ${rarityInfo?.bgColor || 'bg-stone-600'} ${rarityInfo?.textColor || 'text-white'}`}>
                         {rarityInfo?.label}
                       </span>
-                      {spirit.proof && <span className="text-stone-400">{spirit.proof}°</span>}
-                      {spirit.age_statement && <span className="text-stone-400">{spirit.age_statement}</span>}
+                      {inCollection && (
+                        <span className="px-2 py-0.5 rounded text-xs bg-green-600 text-white">✓</span>
+                      )}
+                    </div>
+                    <p className="text-stone-400 text-sm">{spirit.brand} • {categoryInfo?.label}</p>
+                    <div className="flex gap-4 text-sm text-stone-500 mt-1">
+                      {spirit.proof && <span>{spirit.proof}°</span>}
+                      {spirit.age_statement && <span>{spirit.age_statement}</span>}
+                      {spirit.region && <span>{spirit.region}</span>}
                     </div>
                   </div>
 
-                  {/* Action */}
                   {user && (
                     <button
-                      onClick={() => handleCollectionToggle(spirit.id)}
-                      className={`px-4 py-2 rounded-lg font-semibold transition-colors shrink-0 ${
-                        owned
+                      onClick={() => inCollection ? removeFromCollection(spirit.id) : addToCollection(spirit.id)}
+                      className={`px-4 py-2 rounded-lg text-sm font-semibold shrink-0 ${
+                        inCollection
                           ? 'bg-stone-700 hover:bg-red-600/50 text-stone-300'
                           : 'bg-amber-600 hover:bg-amber-700 text-white'
                       }`}
                     >
-                      {owned ? 'Remove' : 'Add'}
+                      {inCollection ? 'Remove' : '+ Add'}
                     </button>
                   )}
                 </div>
@@ -439,22 +391,27 @@ export default function CollectionPage() {
           </div>
         )}
 
-        {/* Sign In CTA */}
-        {!user && !loading && (
-          <div className="mt-12 bg-gradient-to-r from-amber-600/20 to-amber-800/20 border border-amber-600/30 rounded-xl p-8 text-center">
-            <h3 className="text-2xl font-bold mb-4">Start Your Collection</h3>
-            <p className="text-stone-300 mb-6">
-              Sign in to track your spirits, earn $PROOF tokens, and compete on the leaderboards!
-            </p>
-            <Link
-              href="/auth/login"
-              className="inline-block bg-amber-600 hover:bg-amber-700 px-8 py-3 rounded-lg font-semibold transition-colors"
-            >
-              Sign In to Collect
-            </Link>
+        {/* Empty State */}
+        {!loading && filteredSpirits.length === 0 && (
+          <div className="text-center py-12">
+            <div className="text-5xl mb-4">🔍</div>
+            <p className="text-xl mb-2">No spirits found</p>
+            <p className="text-stone-400">Try adjusting your filters or search terms</p>
           </div>
         )}
       </div>
     </div>
+  )
+}
+
+export default function CollectionPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-gradient-to-br from-stone-900 via-amber-950 to-stone-900 text-white flex items-center justify-center">
+        <div className="animate-spin text-5xl">🥃</div>
+      </div>
+    }>
+      <CollectionContent />
+    </Suspense>
   )
 }
