@@ -2,6 +2,7 @@
 
 import Link from 'next/link'
 import { useState, useEffect } from 'react'
+import { useAuth } from '@/lib/hooks/use-auth'
 
 const CATEGORIES = [
   { id: 'bourbon', name: 'Bourbon', icon: '🥃', color: 'bg-amber-600' },
@@ -51,6 +52,7 @@ const STATS = [
 export default function HomePage() {
   const [ageVerified, setAgeVerified] = useState(false)
   const [mounted, setMounted] = useState(false)
+  const { user, loading } = useAuth()
 
   useEffect(() => {
     setMounted(true)
@@ -102,64 +104,74 @@ export default function HomePage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-stone-900 via-amber-950 to-stone-900">
+    <div className="min-h-screen bg-gradient-to-br from-stone-900 via-amber-950 to-stone-900 text-white">
       {/* Navigation */}
-      <nav className="sticky top-0 z-40 bg-stone-900/80 backdrop-blur-lg border-b border-amber-600/20">
-        <div className="container mx-auto px-4 py-4 flex justify-between items-center">
-          {/* Logo */}
+      <nav className="fixed top-0 left-0 right-0 z-40 bg-stone-900/95 backdrop-blur-sm border-b border-amber-600/20">
+        <div className="container mx-auto px-4 py-3 flex items-center justify-between">
           <Link href="/" className="flex items-center gap-2">
             <div className="w-10 h-10 bg-gradient-to-br from-amber-500 to-amber-700 rounded-lg flex items-center justify-center text-2xl shadow-lg">
               🥃
             </div>
-            <span className="text-xl font-bold text-white">
+            <span className="text-xl font-bold">
               Barrel<span className="text-amber-400">Verse</span>
             </span>
           </Link>
-          
-          <div className="flex items-center gap-6">
-            <Link href="/games" className="text-stone-300 hover:text-amber-400 transition-colors hidden md:block">
+          <div className="flex items-center gap-4">
+            <Link href="/games" className="hidden md:block text-stone-300 hover:text-amber-400 transition-colors">
               Games
             </Link>
-            <Link href="/collection" className="text-stone-300 hover:text-amber-400 transition-colors hidden md:block">
+            <Link href="/collection" className="hidden md:block text-stone-300 hover:text-amber-400 transition-colors">
               Collection
             </Link>
-            <Link href="/find" className="text-stone-300 hover:text-amber-400 transition-colors hidden md:block">
+            <Link href="/find" className="hidden md:block text-stone-300 hover:text-amber-400 transition-colors">
               Find Spirits
             </Link>
-            <Link href="/leaderboard" className="text-stone-300 hover:text-amber-400 transition-colors hidden md:block">
+            <Link href="/leaderboard" className="hidden md:block text-stone-300 hover:text-amber-400 transition-colors">
               Leaderboard
             </Link>
-            <Link 
-              href="/auth/login" 
-              className="bg-amber-600 hover:bg-amber-700 text-white px-4 py-2 rounded-lg font-semibold transition-colors"
-            >
-              Sign In
-            </Link>
+            {!loading && (
+              user ? (
+                <Link
+                  href="/profile"
+                  className="bg-amber-600 hover:bg-amber-700 px-4 py-2 rounded-lg font-semibold transition-colors"
+                >
+                  My Profile
+                </Link>
+              ) : (
+                <Link
+                  href="/auth/login"
+                  className="bg-amber-600 hover:bg-amber-700 px-4 py-2 rounded-lg font-semibold transition-colors"
+                >
+                  Sign In
+                </Link>
+              )
+            )}
           </div>
         </div>
       </nav>
 
       {/* Hero Section */}
-      <section className="relative py-20 px-4 overflow-hidden">
-        <div className="absolute inset-0 bg-[url('/whiskey-bg.jpg')] bg-cover bg-center opacity-10" />
-        <div className="container mx-auto text-center relative">
-          <h1 className="text-5xl md:text-6xl font-bold text-white mb-6">
-            Master the Art of
-            <span className="text-transparent bg-clip-text bg-gradient-to-r from-amber-400 to-amber-600"> Fine Spirits</span>
+      <section className="pt-24 pb-12 md:pt-32 md:pb-20 px-4">
+        <div className="container mx-auto text-center">
+          <h1 className="text-4xl md:text-6xl font-bold mb-6">
+            Master the World of{' '}
+            <span className="text-transparent bg-clip-text bg-gradient-to-r from-amber-400 to-amber-600">
+              Premium Spirits
+            </span>
           </h1>
-          <p className="text-xl text-amber-200 mb-8 max-w-2xl mx-auto">
-            Test your knowledge, build your collection, and earn rewards in the ultimate spirits enthusiast platform.
+          <p className="text-xl text-stone-300 mb-8 max-w-2xl mx-auto">
+            Test your knowledge with trivia, build your collection, find rare bottles nearby, and earn $PROOF rewards.
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             <Link
               href="/games"
-              className="bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-white font-bold py-4 px-8 rounded-xl text-lg shadow-lg hover:shadow-amber-500/25 transition-all"
+              className="bg-amber-600 hover:bg-amber-700 px-8 py-4 rounded-lg font-bold text-lg transition-colors shadow-lg"
             >
-              🎮 Play Trivia Games
+              🎮 Play Trivia
             </Link>
             <Link
               href="/collection"
-              className="bg-stone-800 hover:bg-stone-700 text-amber-400 border border-amber-600/30 font-bold py-4 px-8 rounded-xl text-lg transition-all"
+              className="border border-amber-600 hover:bg-amber-600/10 px-8 py-4 rounded-lg font-bold text-lg transition-colors"
             >
               📱 Browse Spirits
             </Link>
@@ -167,10 +179,10 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* Stats Bar */}
-      <section className="bg-stone-800/50 border-y border-amber-600/20 py-8">
-        <div className="container mx-auto px-4">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-8 text-center">
+      {/* Stats */}
+      <section className="py-8 px-4">
+        <div className="container mx-auto">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-6 text-center">
             {STATS.map((stat) => (
               <div key={stat.label}>
                 <div className="text-3xl md:text-4xl font-bold text-amber-400">{stat.value}</div>
@@ -181,7 +193,7 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* Categories - Links to Collection with Filter */}
+      {/* Categories - NOW LINKS TO COLLECTION WITH FILTER */}
       <section className="py-16 px-4">
         <div className="container mx-auto">
           <h2 className="text-3xl font-bold text-white text-center mb-4">Explore Spirit Categories</h2>
