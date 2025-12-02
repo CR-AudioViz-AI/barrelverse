@@ -1,282 +1,426 @@
 'use client'
 
-import Link from 'next/link'
 import { useState, useEffect } from 'react'
+import Link from 'next/link'
 import { useAuth } from '@/lib/hooks/use-auth'
+import { getClient } from '@/lib/supabase/client'
 
 const CATEGORIES = [
-  { id: 'bourbon', name: 'Bourbon', icon: '🥃', color: 'bg-amber-600' },
-  { id: 'scotch', name: 'Scotch', icon: '🏴󠁧󠁢󠁳󠁣󠁴󠁿', color: 'bg-amber-700' },
-  { id: 'irish', name: 'Irish', icon: '☘️', color: 'bg-green-600' },
-  { id: 'japanese', name: 'Japanese', icon: '🇯🇵', color: 'bg-red-500' },
-  { id: 'tequila', name: 'Tequila', icon: '🌵', color: 'bg-lime-600' },
-  { id: 'rum', name: 'Rum', icon: '🏝️', color: 'bg-orange-500' },
-  { id: 'gin', name: 'Gin', icon: '🫒', color: 'bg-teal-500' },
-  { id: 'cognac', name: 'Cognac', icon: '🍇', color: 'bg-indigo-600' },
+  { id: 'bourbon', name: 'Bourbon', icon: '🥃', color: 'amber' },
+  { id: 'scotch', name: 'Scotch', icon: '🏴󠁧󠁢󠁳󠁣󠁴󠁿', color: 'orange' },
+  { id: 'irish', name: 'Irish', icon: '🍀', color: 'green' },
+  { id: 'japanese', name: 'Japanese', icon: '🇯🇵', color: 'red' },
+  { id: 'tequila', name: 'Tequila', icon: '🌵', color: 'lime' },
+  { id: 'rum', name: 'Rum', icon: '🏝️', color: 'amber' },
+  { id: 'wine', name: 'Wine', icon: '🍷', color: 'purple' },
+  { id: 'beer', name: 'Beer', icon: '🍺', color: 'yellow' },
 ]
 
 const FEATURES = [
-  {
-    icon: '🎮',
-    title: 'Trivia Games',
-    description: '500+ questions across 4 game modes. Test your spirits knowledge!',
-    link: '/games',
-  },
-  {
-    icon: '📱',
-    title: 'Spirit Collection',
-    description: 'Browse 100+ premium spirits with detailed tasting notes',
-    link: '/collection',
-  },
-  {
-    icon: '🔍',
-    title: 'Find Nearby',
-    description: 'Search for bottles at local bars, restaurants & liquor stores',
-    link: '/find',
-  },
-  {
-    icon: '🏆',
-    title: '$PROOF Rewards',
-    description: 'Earn tokens and redeem for real merchandise and experiences',
-    link: '/rewards',
-  },
-]
-
-const STATS = [
-  { value: '100+', label: 'Premium Spirits' },
-  { value: '500+', label: 'Trivia Questions' },
-  { value: '4', label: 'Game Modes' },
-  { value: '8', label: 'Categories' },
+  { icon: '🥃', title: '5,700+ Spirits', desc: 'The largest collection database' },
+  { icon: '🎮', title: '4 Game Modes', desc: 'Learn while having fun' },
+  { icon: '📚', title: '12+ Courses', desc: 'From beginner to expert' },
+  { icon: '🏆', title: '600+ Trivia', desc: 'Test your knowledge' },
+  { icon: '💰', title: '$PROOF Rewards', desc: 'Earn as you learn' },
+  { icon: '📊', title: 'Leaderboards', desc: 'Compete globally' },
 ]
 
 export default function HomePage() {
-  const [ageVerified, setAgeVerified] = useState(false)
-  const [mounted, setMounted] = useState(false)
-  const { user, loading } = useAuth()
+  const { user, profile, loading } = useAuth()
+  const [stats, setStats] = useState({ spirits: 0, trivia: 0, courses: 0, users: 0 })
+  const [recentSpirits, setRecentSpirits] = useState<any[]>([])
+  
+  const supabase = getClient()
 
   useEffect(() => {
-    setMounted(true)
-    if (typeof window !== 'undefined') {
-      const verified = sessionStorage.getItem('ageVerified')
-      if (verified === 'true') {
-        setAgeVerified(true)
-      }
+    async function fetchStats() {
+      // Get counts
+      const [spiritsRes, triviaRes, coursesRes] = await Promise.all([
+        supabase.from('bv_spirits').select('id', { count: 'exact', head: true }),
+        supabase.from('bv_trivia_questions').select('id', { count: 'exact', head: true }),
+        supabase.from('bv_courses').select('id', { count: 'exact', head: true }),
+      ])
+      
+      setStats({
+        spirits: spiritsRes.count || 0,
+        trivia: triviaRes.count || 0,
+        courses: coursesRes.count || 0,
+        users: 1000, // Placeholder
+      })
+
+      // Get recent/featured spirits
+      const { data: spirits } = await supabase
+        .from('bv_spirits')
+        .select('id, name, brand, category, proof, rarity, msrp')
+        .in('rarity', ['rare', 'very_rare', 'ultra_rare', 'legendary'])
+        .limit(8)
+      
+      if (spirits) setRecentSpirits(spirits)
     }
-  }, [])
+    
+    fetchStats()
+  }, [supabase])
 
-  const handleAgeVerification = (verified: boolean) => {
-    if (verified) {
-      setAgeVerified(true)
-      if (typeof window !== 'undefined') {
-        sessionStorage.setItem('ageVerified', 'true')
-      }
-    } else {
-      window.location.href = 'https://google.com'
+  const getRarityColor = (rarity: string) => {
+    const colors: Record<string, string> = {
+      common: 'text-gray-400',
+      uncommon: 'text-green-400',
+      rare: 'text-blue-400',
+      very_rare: 'text-purple-400',
+      ultra_rare: 'text-orange-400',
+      legendary: 'text-yellow-400',
     }
-  }
-
-  if (!mounted) return null
-
-  if (!ageVerified) {
-    return (
-      <div className="fixed inset-0 bg-black/90 flex items-center justify-center z-50 p-4">
-        <div className="bg-stone-900 border border-amber-600/30 rounded-2xl max-w-md w-full p-8 text-center">
-          <div className="text-6xl mb-4">🥃</div>
-          <h1 className="text-2xl font-bold text-white mb-2">Welcome to BarrelVerse</h1>
-          <p className="text-stone-300 mb-6">You must be of legal drinking age to access this site.</p>
-          <div className="space-y-3">
-            <button
-              onClick={() => handleAgeVerification(true)}
-              className="w-full py-3 bg-amber-600 text-white rounded-lg font-semibold hover:bg-amber-700 transition-colors"
-            >
-              I am 21 or older - Enter
-            </button>
-            <button
-              onClick={() => handleAgeVerification(false)}
-              className="w-full py-3 border border-stone-600 text-stone-300 rounded-lg font-semibold hover:bg-stone-800 transition-colors"
-            >
-              I am under 21 - Exit
-            </button>
-          </div>
-        </div>
-      </div>
-    )
+    return colors[rarity] || 'text-gray-400'
   }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-stone-900 via-amber-950 to-stone-900 text-white">
       {/* Navigation */}
-      <nav className="fixed top-0 left-0 right-0 z-40 bg-stone-900/95 backdrop-blur-sm border-b border-amber-600/20">
-        <div className="container mx-auto px-4 py-3 flex items-center justify-between">
-          <Link href="/" className="flex items-center gap-2">
-            <div className="w-10 h-10 bg-gradient-to-br from-amber-500 to-amber-700 rounded-lg flex items-center justify-center text-2xl shadow-lg">
-              🥃
+      <nav className="border-b border-amber-600/20 bg-stone-900/80 backdrop-blur-sm sticky top-0 z-50">
+        <div className="container mx-auto px-4 py-4">
+          <div className="flex items-center justify-between">
+            <Link href="/" className="flex items-center gap-2 text-2xl font-bold">
+              <span className="text-4xl">🥃</span>
+              <span className="bg-gradient-to-r from-amber-400 to-amber-600 bg-clip-text text-transparent">
+                BarrelVerse
+              </span>
+            </Link>
+            
+            <div className="hidden md:flex items-center gap-6">
+              <Link href="/collection" className="text-stone-300 hover:text-amber-400 transition-colors">
+                Collection
+              </Link>
+              <Link href="/games" className="text-stone-300 hover:text-amber-400 transition-colors">
+                Games
+              </Link>
+              <Link href="/academy" className="text-stone-300 hover:text-amber-400 transition-colors">
+                Academy
+              </Link>
+              <Link href="/leaderboard" className="text-stone-300 hover:text-amber-400 transition-colors">
+                Leaderboard
+              </Link>
+              <Link href="/rewards" className="text-stone-300 hover:text-amber-400 transition-colors">
+                Rewards
+              </Link>
             </div>
-            <span className="text-xl font-bold">
-              Barrel<span className="text-amber-400">Verse</span>
-            </span>
-          </Link>
-          <div className="flex items-center gap-4">
-            <Link href="/games" className="hidden md:block text-stone-300 hover:text-amber-400 transition-colors">
-              Games
-            </Link>
-            <Link href="/collection" className="hidden md:block text-stone-300 hover:text-amber-400 transition-colors">
-              Collection
-            </Link>
-            <Link href="/find" className="hidden md:block text-stone-300 hover:text-amber-400 transition-colors">
-              Find Spirits
-            </Link>
-            <Link href="/leaderboard" className="hidden md:block text-stone-300 hover:text-amber-400 transition-colors">
-              Leaderboard
-            </Link>
-            {!loading && (
-              user ? (
-                <Link
-                  href="/profile"
-                  className="bg-amber-600 hover:bg-amber-700 px-4 py-2 rounded-lg font-semibold transition-colors"
-                >
-                  My Profile
-                </Link>
+
+            <div className="flex items-center gap-4">
+              {loading ? (
+                <div className="animate-pulse h-10 w-24 bg-stone-700 rounded-lg" />
+              ) : user ? (
+                <div className="flex items-center gap-4">
+                  <div className="text-right hidden sm:block">
+                    <div className="text-sm text-stone-400">Level {profile?.level || 1}</div>
+                    <div className="text-amber-400 font-bold">{profile?.proof_balance || 0} $PROOF</div>
+                  </div>
+                  <Link
+                    href="/profile"
+                    className="px-4 py-2 bg-amber-600 hover:bg-amber-700 rounded-lg font-semibold transition-colors"
+                  >
+                    My Profile
+                  </Link>
+                </div>
               ) : (
                 <Link
                   href="/auth/login"
-                  className="bg-amber-600 hover:bg-amber-700 px-4 py-2 rounded-lg font-semibold transition-colors"
+                  className="px-4 py-2 bg-amber-600 hover:bg-amber-700 rounded-lg font-semibold transition-colors"
                 >
                   Sign In
                 </Link>
-              )
-            )}
+              )}
+            </div>
           </div>
         </div>
       </nav>
 
       {/* Hero Section */}
-      <section className="pt-24 pb-12 md:pt-32 md:pb-20 px-4">
-        <div className="container mx-auto text-center">
-          <h1 className="text-4xl md:text-6xl font-bold mb-6">
-            Master the World of{' '}
-            <span className="text-transparent bg-clip-text bg-gradient-to-r from-amber-400 to-amber-600">
-              Premium Spirits
-            </span>
-          </h1>
-          <p className="text-xl text-stone-300 mb-8 max-w-2xl mx-auto">
-            Test your knowledge with trivia, build your collection, find rare bottles nearby, and earn $PROOF rewards.
-          </p>
-          <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <Link
-              href="/games"
-              className="bg-amber-600 hover:bg-amber-700 px-8 py-4 rounded-lg font-bold text-lg transition-colors shadow-lg"
-            >
-              🎮 Play Trivia
-            </Link>
-            <Link
-              href="/collection"
-              className="border border-amber-600 hover:bg-amber-600/10 px-8 py-4 rounded-lg font-bold text-lg transition-colors"
-            >
-              📱 Browse Spirits
-            </Link>
+      <section className="relative overflow-hidden">
+        <div className="absolute inset-0 bg-[url('/grid.svg')] opacity-10" />
+        <div className="container mx-auto px-4 py-20 relative">
+          <div className="max-w-4xl mx-auto text-center">
+            <div className="inline-block px-4 py-2 bg-amber-600/20 border border-amber-600/50 rounded-full text-amber-400 text-sm mb-6">
+              🎉 Now with {stats.spirits.toLocaleString()}+ spirits in our database!
+            </div>
+            <h1 className="text-5xl md:text-7xl font-bold mb-6 leading-tight">
+              The Ultimate
+              <span className="block bg-gradient-to-r from-amber-400 via-orange-400 to-amber-600 bg-clip-text text-transparent">
+                Spirits Platform
+              </span>
+            </h1>
+            <p className="text-xl text-stone-300 mb-8 max-w-2xl mx-auto">
+              Discover, collect, and master the world of spirits. Play games, earn rewards, 
+              and become a certified connoisseur.
+            </p>
+            <div className="flex flex-wrap justify-center gap-4">
+              <Link
+                href="/collection"
+                className="px-8 py-4 bg-amber-600 hover:bg-amber-700 rounded-xl font-bold text-lg transition-all transform hover:scale-105"
+              >
+                Explore Collection
+              </Link>
+              <Link
+                href="/games"
+                className="px-8 py-4 bg-stone-700 hover:bg-stone-600 border border-amber-600/30 rounded-xl font-bold text-lg transition-all"
+              >
+                Play Games
+              </Link>
+            </div>
           </div>
         </div>
       </section>
 
-      {/* Stats */}
-      <section className="py-8 px-4">
-        <div className="container mx-auto">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-6 text-center">
-            {STATS.map((stat) => (
-              <div key={stat.label}>
-                <div className="text-3xl md:text-4xl font-bold text-amber-400">{stat.value}</div>
-                <div className="text-stone-400 text-sm">{stat.label}</div>
+      {/* Stats Bar */}
+      <section className="border-y border-amber-600/20 bg-stone-800/50">
+        <div className="container mx-auto px-4 py-8">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-8 text-center">
+            <div>
+              <div className="text-4xl font-bold text-amber-400">{stats.spirits.toLocaleString()}+</div>
+              <div className="text-stone-400">Spirits</div>
+            </div>
+            <div>
+              <div className="text-4xl font-bold text-amber-400">{stats.trivia}+</div>
+              <div className="text-stone-400">Trivia Questions</div>
+            </div>
+            <div>
+              <div className="text-4xl font-bold text-amber-400">{stats.courses}+</div>
+              <div className="text-stone-400">Courses</div>
+            </div>
+            <div>
+              <div className="text-4xl font-bold text-amber-400">∞</div>
+              <div className="text-stone-400">Fun to be had</div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Category Browse */}
+      <section className="py-16">
+        <div className="container mx-auto px-4">
+          <h2 className="text-3xl font-bold text-center mb-8">Browse by Category</h2>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            {CATEGORIES.map((cat) => (
+              <Link
+                key={cat.id}
+                href={`/collection?category=${cat.id}`}
+                className="bg-stone-800/50 border border-amber-600/20 rounded-xl p-6 text-center hover:border-amber-500/50 hover:bg-stone-800 transition-all group"
+              >
+                <div className="text-5xl mb-3 group-hover:scale-110 transition-transform">
+                  {cat.icon}
+                </div>
+                <div className="font-bold text-lg group-hover:text-amber-400 transition-colors">
+                  {cat.name}
+                </div>
+              </Link>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Featured Spirits */}
+      {recentSpirits.length > 0 && (
+        <section className="py-16 bg-stone-800/30">
+          <div className="container mx-auto px-4">
+            <div className="flex items-center justify-between mb-8">
+              <h2 className="text-3xl font-bold">Featured Spirits</h2>
+              <Link href="/collection" className="text-amber-400 hover:text-amber-300">
+                View All →
+              </Link>
+            </div>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              {recentSpirits.map((spirit) => (
+                <div
+                  key={spirit.id}
+                  className="bg-stone-800/50 border border-amber-600/20 rounded-xl overflow-hidden hover:border-amber-500/50 transition-all"
+                >
+                  <div className="h-24 bg-gradient-to-br from-amber-900/50 to-stone-800 flex items-center justify-center text-4xl">
+                    🥃
+                  </div>
+                  <div className="p-4">
+                    <h3 className="font-bold truncate">{spirit.name}</h3>
+                    <p className="text-stone-400 text-sm">{spirit.brand}</p>
+                    <div className="flex items-center justify-between mt-2 text-sm">
+                      <span className={getRarityColor(spirit.rarity)}>
+                        {spirit.rarity?.replace('_', ' ')}
+                      </span>
+                      <span className="text-amber-400">{spirit.proof}°</span>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+      )}
+
+      {/* Features Grid */}
+      <section className="py-16">
+        <div className="container mx-auto px-4">
+          <h2 className="text-3xl font-bold text-center mb-12">Everything You Need</h2>
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-6">
+            {FEATURES.map((feature, i) => (
+              <div
+                key={i}
+                className="bg-stone-800/30 border border-amber-600/20 rounded-xl p-6 text-center hover:border-amber-500/50 transition-all"
+              >
+                <div className="text-4xl mb-4">{feature.icon}</div>
+                <h3 className="text-xl font-bold mb-2">{feature.title}</h3>
+                <p className="text-stone-400">{feature.desc}</p>
               </div>
             ))}
           </div>
         </div>
       </section>
 
-      {/* Categories - NOW LINKS TO COLLECTION WITH FILTER */}
-      <section className="py-16 px-4">
-        <div className="container mx-auto">
-          <h2 className="text-3xl font-bold text-white text-center mb-4">Explore Spirit Categories</h2>
-          <p className="text-stone-400 text-center mb-8">Click a category to browse all spirits of that type</p>
+      {/* Game Modes Preview */}
+      <section className="py-16 bg-gradient-to-r from-amber-900/20 to-stone-900/20">
+        <div className="container mx-auto px-4">
+          <h2 className="text-3xl font-bold text-center mb-4">Test Your Knowledge</h2>
+          <p className="text-center text-stone-400 mb-12 max-w-2xl mx-auto">
+            Four exciting game modes to challenge yourself and earn $PROOF rewards.
+          </p>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            {CATEGORIES.map((category) => (
+            {[
+              { icon: '⚡', name: 'Quick Play', desc: '10 questions, casual fun' },
+              { icon: '⏱️', name: 'Time Attack', desc: 'Beat the clock' },
+              { icon: '🎯', name: 'Expert Challenge', desc: 'Hardest questions only' },
+              { icon: '💀', name: 'Survival', desc: 'One wrong = game over' },
+            ].map((mode, i) => (
               <Link
-                key={category.id}
-                href={`/collection?category=${category.id}`}
-                className={`${category.color} hover:opacity-90 rounded-xl p-6 text-center text-white transition-all hover:scale-105 shadow-lg`}
+                key={i}
+                href="/games"
+                className="bg-stone-800/50 border border-amber-600/20 rounded-xl p-6 text-center hover:border-amber-500/50 hover:bg-stone-800 transition-all group"
               >
-                <span className="text-4xl block mb-2">{category.icon}</span>
-                <span className="font-semibold">{category.name}</span>
+                <div className="text-4xl mb-3 group-hover:scale-110 transition-transform">
+                  {mode.icon}
+                </div>
+                <h3 className="font-bold mb-1 group-hover:text-amber-400 transition-colors">
+                  {mode.name}
+                </h3>
+                <p className="text-sm text-stone-400">{mode.desc}</p>
               </Link>
             ))}
+          </div>
+          <div className="text-center mt-8">
+            <Link
+              href="/games"
+              className="inline-block px-8 py-3 bg-amber-600 hover:bg-amber-700 rounded-xl font-bold transition-colors"
+            >
+              Start Playing
+            </Link>
           </div>
         </div>
       </section>
 
-      {/* Features */}
-      <section className="py-16 px-4 bg-stone-800/30">
-        <div className="container mx-auto">
-          <h2 className="text-3xl font-bold text-white text-center mb-12">Everything You Need</h2>
-          <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
-            {FEATURES.map((feature) => (
+      {/* Academy Preview */}
+      <section className="py-16">
+        <div className="container mx-auto px-4">
+          <div className="grid md:grid-cols-2 gap-12 items-center">
+            <div>
+              <h2 className="text-3xl font-bold mb-4">🎓 BarrelVerse Academy</h2>
+              <p className="text-stone-300 mb-6">
+                From beginner basics to expert certifications. Learn everything about 
+                bourbon, scotch, wine, beer, and more from our comprehensive course library.
+              </p>
+              <ul className="space-y-3 mb-8">
+                <li className="flex items-center gap-3">
+                  <span className="text-amber-400">✓</span>
+                  <span>{stats.courses}+ comprehensive courses</span>
+                </li>
+                <li className="flex items-center gap-3">
+                  <span className="text-amber-400">✓</span>
+                  <span>Earn $PROOF for completing lessons</span>
+                </li>
+                <li className="flex items-center gap-3">
+                  <span className="text-amber-400">✓</span>
+                  <span>Official certifications</span>
+                </li>
+                <li className="flex items-center gap-3">
+                  <span className="text-amber-400">✓</span>
+                  <span>Learn at your own pace</span>
+                </li>
+              </ul>
               <Link
-                key={feature.title}
-                href={feature.link}
-                className="bg-stone-800/50 border border-amber-600/20 rounded-xl p-6 hover:border-amber-500/50 hover:bg-stone-800/70 transition-all group"
+                href="/academy"
+                className="inline-block px-8 py-3 bg-stone-700 hover:bg-stone-600 border border-amber-600/30 rounded-xl font-bold transition-colors"
               >
-                <div className="text-4xl mb-4">{feature.icon}</div>
-                <h3 className="text-xl font-bold text-white mb-2 group-hover:text-amber-400 transition-colors">
-                  {feature.title}
-                </h3>
-                <p className="text-stone-400">{feature.description}</p>
+                Browse Courses
               </Link>
-            ))}
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              {['Bourbon 101', 'Scotch Regions', 'Wine Basics', 'Tasting Skills'].map((course, i) => (
+                <div
+                  key={i}
+                  className="bg-stone-800/50 border border-amber-600/20 rounded-xl p-4 text-center"
+                >
+                  <div className="text-3xl mb-2">{['🥃', '🏴󠁧󠁢󠁳󠁣󠁴󠁿', '🍷', '👅'][i]}</div>
+                  <div className="font-medium">{course}</div>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
       </section>
 
       {/* CTA Section */}
-      <section className="py-20 px-4">
-        <div className="container mx-auto">
-          <div className="bg-gradient-to-r from-amber-900/50 to-amber-800/50 border border-amber-600/30 rounded-2xl p-8 md:p-12 text-center">
-            <h2 className="text-3xl font-bold text-white mb-4">Own a Bar or Liquor Store?</h2>
-            <p className="text-amber-200 mb-8 max-w-2xl mx-auto">
-              List your inventory and reach thousands of spirits enthusiasts actively searching for bottles near them.
+      {!user && (
+        <section className="py-20 bg-gradient-to-r from-amber-900/30 to-orange-900/30">
+          <div className="container mx-auto px-4 text-center">
+            <h2 className="text-4xl font-bold mb-4">Ready to Begin Your Journey?</h2>
+            <p className="text-xl text-stone-300 mb-8 max-w-2xl mx-auto">
+              Join thousands of spirit enthusiasts. Collect, learn, play, and earn.
             </p>
             <Link
-              href="/business/register"
-              className="inline-block bg-white text-amber-900 font-bold py-3 px-8 rounded-lg hover:bg-amber-100 transition-colors"
+              href="/auth/register"
+              className="inline-block px-10 py-4 bg-amber-600 hover:bg-amber-700 rounded-xl font-bold text-xl transition-all transform hover:scale-105"
             >
-              List Your Business Free →
+              Create Free Account
             </Link>
           </div>
-        </div>
-      </section>
+        </section>
+      )}
 
       {/* Footer */}
-      <footer className="bg-stone-900 border-t border-amber-600/20 py-12 px-4">
-        <div className="container mx-auto">
-          <div className="flex flex-col md:flex-row justify-between items-center gap-6">
-            <div className="flex items-center gap-2">
-              <div className="w-8 h-8 bg-gradient-to-br from-amber-500 to-amber-700 rounded-lg flex items-center justify-center text-xl">
-                🥃
+      <footer className="border-t border-amber-600/20 bg-stone-900/80">
+        <div className="container mx-auto px-4 py-12">
+          <div className="grid md:grid-cols-4 gap-8">
+            <div>
+              <div className="flex items-center gap-2 text-xl font-bold mb-4">
+                <span className="text-2xl">🥃</span>
+                <span>BarrelVerse</span>
               </div>
-              <span className="text-lg font-bold text-white">
-                Barrel<span className="text-amber-400">Verse</span>
-              </span>
+              <p className="text-stone-400 text-sm">
+                The ultimate platform for spirit enthusiasts. Discover, collect, and master.
+              </p>
             </div>
-            <div className="flex flex-wrap justify-center gap-6 text-sm">
-              <Link href="/games" className="text-stone-400 hover:text-amber-400 transition-colors">Games</Link>
-              <Link href="/collection" className="text-stone-400 hover:text-amber-400 transition-colors">Collection</Link>
-              <Link href="/find" className="text-stone-400 hover:text-amber-400 transition-colors">Find Spirits</Link>
-              <Link href="/rewards" className="text-stone-400 hover:text-amber-400 transition-colors">Rewards</Link>
-              <Link href="/leaderboard" className="text-stone-400 hover:text-amber-400 transition-colors">Leaderboard</Link>
-              <Link href="/business/register" className="text-stone-400 hover:text-amber-400 transition-colors">For Business</Link>
-              <Link href="/auth/login" className="text-stone-400 hover:text-amber-400 transition-colors">Sign In</Link>
+            <div>
+              <h4 className="font-bold mb-4">Explore</h4>
+              <ul className="space-y-2 text-stone-400">
+                <li><Link href="/collection" className="hover:text-amber-400">Collection</Link></li>
+                <li><Link href="/games" className="hover:text-amber-400">Games</Link></li>
+                <li><Link href="/academy" className="hover:text-amber-400">Academy</Link></li>
+                <li><Link href="/leaderboard" className="hover:text-amber-400">Leaderboard</Link></li>
+              </ul>
+            </div>
+            <div>
+              <h4 className="font-bold mb-4">Community</h4>
+              <ul className="space-y-2 text-stone-400">
+                <li><Link href="/rewards" className="hover:text-amber-400">Rewards</Link></li>
+                <li><Link href="/find" className="hover:text-amber-400">Find Spirits</Link></li>
+                <li><Link href="/business" className="hover:text-amber-400">For Business</Link></li>
+              </ul>
+            </div>
+            <div>
+              <h4 className="font-bold mb-4">Legal</h4>
+              <ul className="space-y-2 text-stone-400">
+                <li><Link href="/docs" className="hover:text-amber-400">Documentation</Link></li>
+                <li><a href="#" className="hover:text-amber-400">Privacy Policy</a></li>
+                <li><a href="#" className="hover:text-amber-400">Terms of Service</a></li>
+              </ul>
             </div>
           </div>
-          <div className="mt-8 pt-8 border-t border-stone-800 text-center text-stone-500 text-sm">
-            <p>© 2024 BarrelVerse. Drink responsibly. Must be 21+ to use this service.</p>
+          <div className="border-t border-stone-700 mt-8 pt-8 text-center text-stone-500 text-sm">
+            <p>© 2025 BarrelVerse. All rights reserved. Must be 21+ to use this platform.</p>
+            <p className="mt-2">A CR AudioViz AI Product</p>
           </div>
         </div>
       </footer>
