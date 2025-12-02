@@ -46,6 +46,19 @@ const DIFFICULTY_COLORS: Record<string, string> = {
   expert: 'bg-purple-500/20 text-purple-400 border-purple-500/30',
 }
 
+function calculateLevel(proofBalance: number): number {
+  if (proofBalance < 100) return 1
+  if (proofBalance < 500) return 2
+  if (proofBalance < 1000) return 3
+  if (proofBalance < 2500) return 4
+  if (proofBalance < 5000) return 5
+  if (proofBalance < 10000) return 6
+  if (proofBalance < 25000) return 7
+  if (proofBalance < 50000) return 8
+  if (proofBalance < 100000) return 9
+  return 10 + Math.floor((proofBalance - 100000) / 50000)
+}
+
 export default function AcademyPage() {
   const { user, profile, loading: authLoading } = useAuth()
   const [courses, setCourses] = useState<Course[]>([])
@@ -108,6 +121,8 @@ export default function AcademyPage() {
     return mins > 0 ? `${hours}h ${mins}m` : `${hours}h`
   }
 
+  const userLevel = profile ? calculateLevel(profile.proof_balance || 0) : 1
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-stone-900 via-amber-950 to-stone-900 text-white">
       {/* Header */}
@@ -124,7 +139,7 @@ export default function AcademyPage() {
             {user && profile && (
               <div className="flex items-center gap-4">
                 <div className="text-amber-400">
-                  <span className="text-stone-400">Level</span> {profile.level || 1}
+                  <span className="text-stone-400">Level</span> {userLevel}
                 </div>
                 <div className="text-amber-400">
                   <span className="text-stone-400">$PROOF</span> {profile.proof_balance || 0}
@@ -219,7 +234,6 @@ export default function AcademyPage() {
                   key={course.id}
                   className="bg-stone-800/50 border border-amber-600/20 rounded-xl overflow-hidden hover:border-amber-500/50 transition-all group"
                 >
-                  {/* Course Header */}
                   <div className="h-32 bg-gradient-to-br from-amber-900/50 to-stone-800 flex items-center justify-center text-5xl relative">
                     {CATEGORY_ICONS[course.category] || '📚'}
                     {course.is_premium && (
@@ -232,7 +246,6 @@ export default function AcademyPage() {
                     </div>
                   </div>
 
-                  {/* Course Info */}
                   <div className="p-5">
                     <h3 className="text-lg font-bold mb-2 group-hover:text-amber-400 transition-colors">
                       {course.title}
@@ -241,7 +254,6 @@ export default function AcademyPage() {
                       {course.description}
                     </p>
 
-                    {/* Stats */}
                     <div className="flex items-center justify-between text-sm mb-4">
                       <div className="flex items-center gap-4">
                         <span className="text-stone-400">
@@ -253,7 +265,6 @@ export default function AcademyPage() {
                       </div>
                     </div>
 
-                    {/* Lessons Preview */}
                     {lessons.length > 0 && (
                       <div className="mb-4">
                         <div className="text-xs text-stone-500 mb-2">LESSONS:</div>
@@ -272,7 +283,6 @@ export default function AcademyPage() {
                       </div>
                     )}
 
-                    {/* Footer */}
                     <div className="flex items-center justify-between pt-4 border-t border-stone-700">
                       <div className="text-amber-400 font-bold">
                         +{course.proof_reward} $PROOF
@@ -306,34 +316,6 @@ export default function AcademyPage() {
                 <h4 className="font-bold text-amber-400">{cert.name}</h4>
                 <p className="text-sm text-stone-400 mb-2">{cert.desc}</p>
                 <div className="text-amber-300 text-sm">+{cert.reward} $PROOF</div>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Learning Tracks */}
-        <div className="mt-16">
-          <h3 className="text-2xl font-bold mb-6 text-center">📍 Learning Tracks</h3>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {[
-              { name: 'Whiskey Explorer', icon: '🥃', courses: ['Bourbon 101', 'Scotch Fundamentals', 'World Whiskies'], color: 'amber' },
-              { name: 'Wine Enthusiast', icon: '🍷', courses: ['Wine Basics', 'Red Wines', 'White Wines'], color: 'purple' },
-              { name: 'Spirits Professional', icon: '🎓', courses: ['All Beginner', 'All Intermediate', 'Certification Prep'], color: 'blue' },
-            ].map((track) => (
-              <div
-                key={track.name}
-                className={`bg-stone-800/30 border border-${track.color}-600/20 rounded-xl p-6 hover:border-${track.color}-500/50 transition-all`}
-              >
-                <div className="text-4xl mb-3">{track.icon}</div>
-                <h4 className="text-xl font-bold mb-2">{track.name}</h4>
-                <ul className="text-sm text-stone-400 space-y-1 mb-4">
-                  {track.courses.map((c, i) => (
-                    <li key={i}>✓ {c}</li>
-                  ))}
-                </ul>
-                <button className={`w-full py-2 bg-${track.color}-600/20 border border-${track.color}-600/50 rounded-lg text-${track.color}-400 hover:bg-${track.color}-600/30 transition-colors`}>
-                  Start Track
-                </button>
               </div>
             ))}
           </div>
