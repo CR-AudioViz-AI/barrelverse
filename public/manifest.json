@@ -1,0 +1,149 @@
+{
+  "name": "BarrelVerse - The Ultimate Spirits Platform",
+  "short_name": "BarrelVerse",
+  "description": "Track your collection, age barrels, discover spirits, and connect with collectors worldwide.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0c0a09",
+  "theme_color": "#d97706",
+  "orientation": "portrait-primary",
+  "scope": "/",
+  "lang": "en",
+  "categories": ["lifestyle", "food", "social"],
+  "icons": [
+    {
+      "src": "/icons/icon-72x72.png",
+      "sizes": "72x72",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icons/icon-96x96.png",
+      "sizes": "96x96",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icons/icon-128x128.png",
+      "sizes": "128x128",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icons/icon-144x144.png",
+      "sizes": "144x144",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icons/icon-152x152.png",
+      "sizes": "152x152",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icons/icon-192x192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icons/icon-384x384.png",
+      "sizes": "384x384",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icons/icon-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "screenshots": [
+    {
+      "src": "/screenshots/home.png",
+      "sizes": "1080x1920",
+      "type": "image/png",
+      "form_factor": "narrow",
+      "label": "Home Screen"
+    },
+    {
+      "src": "/screenshots/collection.png",
+      "sizes": "1080x1920",
+      "type": "image/png",
+      "form_factor": "narrow",
+      "label": "Your Collection"
+    },
+    {
+      "src": "/screenshots/scanner.png",
+      "sizes": "1080x1920",
+      "type": "image/png",
+      "form_factor": "narrow",
+      "label": "Bottle Scanner"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Scan Bottle",
+      "short_name": "Scan",
+      "description": "Scan a bottle to add to collection",
+      "url": "/scanner",
+      "icons": [{ "src": "/icons/scan-icon.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "My Collection",
+      "short_name": "Collection",
+      "description": "View your spirits collection",
+      "url": "/collection",
+      "icons": [{ "src": "/icons/collection-icon.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Explore Spirits",
+      "short_name": "Explore",
+      "description": "Browse the spirits database",
+      "url": "/spirits",
+      "icons": [{ "src": "/icons/explore-icon.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Daily Quiz",
+      "short_name": "Quiz",
+      "description": "Test your spirits knowledge",
+      "url": "/trivia",
+      "icons": [{ "src": "/icons/quiz-icon.png", "sizes": "192x192" }]
+    }
+  ],
+  "related_applications": [],
+  "prefer_related_applications": false,
+  "share_target": {
+    "action": "/share-target",
+    "method": "POST",
+    "enctype": "multipart/form-data",
+    "params": {
+      "title": "title",
+      "text": "text",
+      "url": "url",
+      "files": [
+        {
+          "name": "photos",
+          "accept": ["image/*"]
+        }
+      ]
+    }
+  },
+  "protocol_handlers": [
+    {
+      "protocol": "web+barrelverse",
+      "url": "/%s"
+    }
+  ],
+  "file_handlers": [
+    {
+      "action": "/import",
+      "accept": {
+        "text/csv": [".csv"],
+        "application/json": [".json"]
+      }
+    }
+  ]
+}
