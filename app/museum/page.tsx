@@ -320,6 +320,14 @@ const MUSEUM_WINGS: Record<string, MuseumWing> = {
       { name: 'Appleton Estate 50 Year', distillery: 'Appleton Estate', year: 'Limited Release', value: '$5,000+', story: 'The oldest rum from Jamaica, half a century in tropical aging.', rarity: 'legendary' as const }
     ],
     
+    bottles: [
+      { era: 'Colonial Period', year: '1650-1800', description: 'Crude clay jugs and repurposed wine bottles', changes: ['No standardization', 'Hand-blown glass', 'Wax seals'], rarity: 'legendary' as const },
+      { era: 'Industrial Age', year: '1800-1900', description: 'Standardized glass bottles, embossed labels', changes: ['Machine-made glass', 'Cork stoppers', 'Paper labels'], rarity: 'rare' as const },
+      { era: 'Prohibition Era', year: '1920-1933', description: 'Rum running bottles, Cuban imports', changes: ['Hidden compartments', 'Fake labels', 'Canadian routes'], rarity: 'legendary' as const },
+      { era: 'Tiki Renaissance', year: '1934-1970', description: 'Exotic bottles for tiki bars, ceramic tiki mugs', changes: ['Colorful designs', 'Collectible decanters', 'Themed packaging'], rarity: 'rare' as const },
+      { era: 'Premium Age', year: '2000-Present', description: 'Aged rum in whisky-style presentation', changes: ['Age statements', 'Single cask releases', 'Collector editions'], rarity: 'common' as const }
+    ],
+    
     exhibits: [
       { id: 'pirates', title: 'Pirates & Privateers', icon: '☠️', description: 'How rum fueled the Golden Age of Piracy' },
       { id: 'navy', title: 'The Navy Grog Room', icon: '⚓', description: '315 years of Royal Navy rum tradition' },
@@ -353,6 +361,14 @@ const MUSEUM_WINGS: Record<string, MuseumWing> = {
       { name: 'Clase Azul Ultra', distillery: 'Clase Azul', year: 'Ongoing', value: '$1,700+', story: 'Presented in hand-painted decanter with platinum, amber accents, and 24k gold label.', rarity: 'rare' as const },
       { name: 'Ley .925 Pasión Azteca', distillery: 'Ley .925', year: '2006', value: '$225,000', story: 'Most expensive tequila ever sold. Platinum and white gold bottle by Fernando Altamirano.', rarity: 'mythical' as const },
       { name: 'Fortaleza Winter Blend', distillery: 'Fortaleza', year: 'Limited Release', value: '$100-200', story: 'Small-batch traditional production, highly allocated.', rarity: 'legendary' as const }
+    ],
+    
+    bottles: [
+      { era: 'Pre-Regulation', year: '1795-1900', description: 'Ceramic cantarito jugs, barrel dispensing', changes: ['Local production only', 'No labeling', 'Regional styles'], rarity: 'legendary' as const },
+      { era: 'Early Commercial', year: '1900-1950', description: 'Glass bottles with hand-painted labels', changes: ['Brand emergence', 'Export begins', 'Standardized bottles'], rarity: 'rare' as const },
+      { era: 'DOO Era', year: '1974-1990', description: 'Denominated origin packaging requirements', changes: ['NOM numbers', 'Age categories', 'Quality standards'], rarity: 'rare' as const },
+      { era: 'Celebrity Brands', year: '1990-2010', description: 'Designer bottles, celebrity partnerships', changes: ['Distinctive shapes', 'Premium positioning', 'Marketing focus'], rarity: 'common' as const },
+      { era: 'Artisan Revival', year: '2010-Present', description: 'Hand-crafted bottles, traditional imagery', changes: ['Ceramic decanters', 'Hand-painted art', 'Limited releases'], rarity: 'common' as const }
     ],
     
     exhibits: [
@@ -389,6 +405,14 @@ const MUSEUM_WINGS: Record<string, MuseumWing> = {
       { name: 'Billionaire Vodka', distillery: 'Leon Verres', year: 'Special Order', value: '$3.7 Million', story: 'Filtered through diamonds, Nordic birch charcoal, and sand from crushed gems.', rarity: 'mythical' as const },
       { name: 'Russo-Baltique Vodka', distillery: 'Russo-Baltique', year: '2015', value: '$1.3 Million', story: 'Bottle made from bulletproof glass, gold, and diamond-encrusted cap.', rarity: 'mythical' as const },
       { name: 'Stolichnaya Elit', distillery: 'Stolichnaya', year: 'Ongoing', value: '$60-100', story: 'Freeze-filtered at -18°C for ultimate purity.', rarity: 'rare' as const }
+    ],
+    
+    bottles: [
+      { era: 'Imperial Russia', year: '1700-1917', description: 'Crystal decanters for nobility, earthenware for masses', changes: ['Class distinction', 'Ornate etching', 'Noble crests'], rarity: 'mythical' as const },
+      { era: 'Soviet Era', year: '1917-1991', description: 'Utilitarian state-produced bottles', changes: ['Standardized design', 'Minimal branding', 'Mass production'], rarity: 'rare' as const },
+      { era: 'Western Introduction', year: '1933-1980', description: 'Clear bottles emphasizing purity', changes: ['Simple labels', 'Quality claims', 'Mixability focus'], rarity: 'rare' as const },
+      { era: 'Marketing Era', year: '1981-2000', description: 'Absolut iconic shape, creative advertising', changes: ['Distinctive silhouettes', 'Art collaborations', 'Limited editions'], rarity: 'common' as const },
+      { era: 'Luxury Age', year: '2000-Present', description: 'Crystal bottles, precious metals, gem filtration claims', changes: ['Ultra-premium pricing', 'Status symbols', 'Collector items'], rarity: 'common' as const }
     ],
     
     exhibits: [
