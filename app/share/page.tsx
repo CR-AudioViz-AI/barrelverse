@@ -1,328 +1,534 @@
-'use client'
+'use client';
 
-import { useState, useRef } from 'react'
-import Link from 'next/link'
+import { useState, useRef } from 'react';
+import { motion } from 'framer-motion';
+import { 
+  Share2, 
+  Download, 
+  Twitter, 
+  Facebook, 
+  Copy, 
+  Check,
+  Wine,
+  Trophy,
+  Star,
+  Flame,
+  Camera
+} from 'lucide-react';
 
-// Card templates
-const CARD_TEMPLATES = [
-  { id: 'classic', name: 'Classic', bg: 'from-amber-900 to-stone-900', accent: 'amber' },
-  { id: 'dark', name: 'Dark Mode', bg: 'from-stone-900 to-black', accent: 'white' },
-  { id: 'premium', name: 'Premium Gold', bg: 'from-yellow-700 via-amber-600 to-yellow-700', accent: 'black' },
-  { id: 'vintage', name: 'Vintage', bg: 'from-amber-800 to-red-900', accent: 'cream' },
-  { id: 'modern', name: 'Modern', bg: 'from-slate-800 to-slate-900', accent: 'cyan' },
-  { id: 'bourbon', name: 'Bourbon Trail', bg: 'from-amber-950 via-amber-900 to-amber-950', accent: 'gold' }
-]
-
-// Mock user data
-const MOCK_USER = {
-  name: 'BourbonCollector',
-  level: 42,
-  memberSince: '2022',
-  totalBottles: 127,
-  totalValue: 28450,
-  uniqueDistilleries: 34,
-  rarest: 'Pappy Van Winkle 23 Year',
-  favoriteCategory: 'Bourbon',
-  topRated: { name: 'George T. Stagg 2021', rating: 97 },
-  achievements: ['Century Club', 'Pappy Hunter', 'BTAC Complete'],
-  badges: ['🏆', '👑', '💎', '🔥', '⭐']
+interface CollectionStats {
+  totalBottles: number;
+  totalValue: number;
+  rareBottles: number;
+  topCategory: string;
+  favoriteDistillery: string;
+  avgRating: number;
+  joinDate: string;
+  achievements: number;
 }
 
-const SHARE_STATS = [
-  { label: 'Bottles', value: '127', icon: '🥃' },
-  { label: 'Value', value: '$28.4K', icon: '💰' },
-  { label: 'Distilleries', value: '34', icon: '🏭' },
-  { label: 'Rating Avg', value: '89.2', icon: '⭐' }
-]
+interface ShareCardProps {
+  username: string;
+  avatarUrl?: string;
+  stats: CollectionStats;
+  theme?: 'amber' | 'midnight' | 'vintage';
+}
 
-export default function ShareCardsPage() {
-  const [selectedTemplate, setSelectedTemplate] = useState('classic')
-  const [cardType, setCardType] = useState<'collection' | 'bottle' | 'achievement' | 'stats'>('collection')
-  const [showBadges, setShowBadges] = useState(true)
-  const [showValue, setShowValue] = useState(true)
-  const [isGenerating, setIsGenerating] = useState(false)
-  const cardRef = useRef<HTMLDivElement>(null)
+const themes = {
+  amber: {
+    bg: 'from-amber-900 via-amber-800 to-stone-900',
+    accent: 'amber-400',
+    text: 'amber-100',
+  },
+  midnight: {
+    bg: 'from-slate-900 via-indigo-900 to-slate-900',
+    accent: 'blue-400',
+    text: 'blue-100',
+  },
+  vintage: {
+    bg: 'from-stone-800 via-amber-950 to-stone-900',
+    accent: 'orange-400',
+    text: 'orange-100',
+  },
+};
 
-  const template = CARD_TEMPLATES.find(t => t.id === selectedTemplate) || CARD_TEMPLATES[0]
+export function ShareableCollectionCard({ username, avatarUrl, stats, theme = 'amber' }: ShareCardProps) {
+  const [copied, setCopied] = useState(false);
+  const cardRef = useRef<HTMLDivElement>(null);
+  const themeStyles = themes[theme];
 
-  const generateCard = () => {
-    setIsGenerating(true)
-    // Simulate generation
-    setTimeout(() => {
-      setIsGenerating(false)
-      // In production, this would use html2canvas or similar
-      alert('Card generated! In production, this would download as PNG or share directly.')
-    }, 1500)
-  }
+  const shareUrl = `https://barrelverse.com/u/${username}`;
+  const shareText = `Check out my bourbon collection on BarrelVerse! 🥃 ${stats.totalBottles} bottles, $${stats.totalValue.toLocaleString()} total value. #BarrelVerse #BourbonCollection`;
 
-  const shareToSocial = (platform: string) => {
-    const shareText = `Check out my whiskey collection on BarrelVerse! 🥃 ${MOCK_USER.totalBottles} bottles worth $${MOCK_USER.totalValue.toLocaleString()}. Join me!`
-    const shareUrl = 'https://barrelverse.com/u/bourboncollector'
-    
-    const urls: Record<string, string> = {
-      twitter: `https://twitter.com/intent/tweet?text=${encodeURIComponent(shareText)}&url=${encodeURIComponent(shareUrl)}`,
-      facebook: `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(shareUrl)}&quote=${encodeURIComponent(shareText)}`,
-      reddit: `https://reddit.com/submit?url=${encodeURIComponent(shareUrl)}&title=${encodeURIComponent(shareText)}`,
-      whatsapp: `https://wa.me/?text=${encodeURIComponent(shareText + ' ' + shareUrl)}`
-    }
-    
-    window.open(urls[platform], '_blank', 'width=600,height=400')
-  }
+  const handleCopyLink = async () => {
+    await navigator.clipboard.writeText(shareUrl);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  const handleTwitterShare = () => {
+    window.open(
+      `https://twitter.com/intent/tweet?text=${encodeURIComponent(shareText)}&url=${encodeURIComponent(shareUrl)}`,
+      '_blank'
+    );
+  };
+
+  const handleFacebookShare = () => {
+    window.open(
+      `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(shareUrl)}`,
+      '_blank'
+    );
+  };
+
+  const handleDownload = async () => {
+    // In production, this would use html2canvas or similar
+    alert('Download feature coming soon! Screenshot your card for now.');
+  };
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-stone-950 via-purple-950/20 to-stone-950 text-white">
+    <div className="space-y-6">
+      {/* The Shareable Card */}
+      <div
+        ref={cardRef}
+        className={`relative overflow-hidden rounded-3xl bg-gradient-to-br ${themeStyles.bg} p-8 shadow-2xl`}
+        style={{ width: '400px', height: '600px' }}
+      >
+        {/* Background Pattern */}
+        <div className="absolute inset-0 opacity-10">
+          <div className="absolute top-10 right-10 w-64 h-64 rounded-full bg-amber-500 blur-3xl" />
+          <div className="absolute bottom-10 left-10 w-48 h-48 rounded-full bg-orange-500 blur-3xl" />
+        </div>
+
+        {/* Content */}
+        <div className="relative z-10 h-full flex flex-col">
+          {/* Header */}
+          <div className="text-center mb-6">
+            <div className="inline-flex items-center gap-2 mb-4">
+              <span className="text-3xl">🥃</span>
+              <span className={`text-xl font-bold text-${themeStyles.accent}`}>BarrelVerse</span>
+            </div>
+            
+            {/* Avatar */}
+            <div className="w-24 h-24 mx-auto rounded-full bg-gradient-to-br from-amber-400 to-orange-600 flex items-center justify-center text-4xl shadow-lg shadow-amber-500/30 mb-4">
+              {avatarUrl ? (
+                <img src={avatarUrl} alt={username} className="w-full h-full rounded-full object-cover" />
+              ) : (
+                username.charAt(0).toUpperCase()
+              )}
+            </div>
+            
+            <h2 className="text-2xl font-bold text-white">{username}</h2>
+            <p className={`text-${themeStyles.text}/70`}>Member since {stats.joinDate}</p>
+          </div>
+
+          {/* Stats Grid */}
+          <div className="grid grid-cols-2 gap-4 mb-6">
+            <div className={`bg-white/5 rounded-xl p-4 border border-${themeStyles.accent}/20`}>
+              <Wine className={`w-6 h-6 text-${themeStyles.accent} mb-2`} />
+              <p className="text-3xl font-bold text-white">{stats.totalBottles}</p>
+              <p className={`text-sm text-${themeStyles.text}/70`}>Bottles</p>
+            </div>
+            
+            <div className={`bg-white/5 rounded-xl p-4 border border-${themeStyles.accent}/20`}>
+              <Trophy className={`w-6 h-6 text-${themeStyles.accent} mb-2`} />
+              <p className="text-3xl font-bold text-white">${stats.totalValue.toLocaleString()}</p>
+              <p className={`text-sm text-${themeStyles.text}/70`}>Collection Value</p>
+            </div>
+            
+            <div className={`bg-white/5 rounded-xl p-4 border border-${themeStyles.accent}/20`}>
+              <Star className={`w-6 h-6 text-${themeStyles.accent} mb-2`} />
+              <p className="text-3xl font-bold text-white">{stats.rareBottles}</p>
+              <p className={`text-sm text-${themeStyles.text}/70`}>Rare Bottles</p>
+            </div>
+            
+            <div className={`bg-white/5 rounded-xl p-4 border border-${themeStyles.accent}/20`}>
+              <Flame className={`w-6 h-6 text-${themeStyles.accent} mb-2`} />
+              <p className="text-3xl font-bold text-white">{stats.achievements}</p>
+              <p className={`text-sm text-${themeStyles.text}/70`}>Achievements</p>
+            </div>
+          </div>
+
+          {/* Favorite Info */}
+          <div className={`bg-white/5 rounded-xl p-4 border border-${themeStyles.accent}/20 mb-6`}>
+            <p className={`text-sm text-${themeStyles.text}/70 mb-1`}>Favorite Category</p>
+            <p className="text-lg font-bold text-white capitalize">{stats.topCategory}</p>
+            <p className={`text-sm text-${themeStyles.text}/70 mt-2 mb-1`}>Top Distillery</p>
+            <p className="text-lg font-bold text-white">{stats.favoriteDistillery}</p>
+          </div>
+
+          {/* Rating */}
+          <div className="mt-auto">
+            <div className="flex items-center justify-center gap-1 mb-2">
+              {[1, 2, 3, 4, 5].map((star) => (
+                <Star
+                  key={star}
+                  className={`w-6 h-6 ${
+                    star <= Math.round(stats.avgRating)
+                      ? `text-${themeStyles.accent} fill-${themeStyles.accent}`
+                      : 'text-white/20'
+                  }`}
+                />
+              ))}
+            </div>
+            <p className={`text-center text-${themeStyles.text}/70`}>
+              Average Rating: {stats.avgRating.toFixed(1)}
+            </p>
+          </div>
+
+          {/* Watermark */}
+          <p className={`text-center text-${themeStyles.text}/40 text-xs mt-4`}>
+            barrelverse.com • Your Story. Our Design.
+          </p>
+        </div>
+      </div>
+
+      {/* Share Actions */}
+      <div className="flex flex-wrap gap-3 justify-center">
+        <motion.button
+          whileHover={{ scale: 1.05 }}
+          whileTap={{ scale: 0.95 }}
+          onClick={handleTwitterShare}
+          className="flex items-center gap-2 px-4 py-2 bg-[#1DA1F2] text-white rounded-lg font-medium hover:bg-[#1a8cd8] transition-colors"
+        >
+          <Twitter className="w-4 h-4" />
+          Tweet
+        </motion.button>
+
+        <motion.button
+          whileHover={{ scale: 1.05 }}
+          whileTap={{ scale: 0.95 }}
+          onClick={handleFacebookShare}
+          className="flex items-center gap-2 px-4 py-2 bg-[#4267B2] text-white rounded-lg font-medium hover:bg-[#365899] transition-colors"
+        >
+          <Facebook className="w-4 h-4" />
+          Share
+        </motion.button>
+
+        <motion.button
+          whileHover={{ scale: 1.05 }}
+          whileTap={{ scale: 0.95 }}
+          onClick={handleCopyLink}
+          className="flex items-center gap-2 px-4 py-2 bg-stone-700 text-white rounded-lg font-medium hover:bg-stone-600 transition-colors"
+        >
+          {copied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+          {copied ? 'Copied!' : 'Copy Link'}
+        </motion.button>
+
+        <motion.button
+          whileHover={{ scale: 1.05 }}
+          whileTap={{ scale: 0.95 }}
+          onClick={handleDownload}
+          className="flex items-center gap-2 px-4 py-2 bg-amber-600 text-white rounded-lg font-medium hover:bg-amber-500 transition-colors"
+        >
+          <Download className="w-4 h-4" />
+          Download
+        </motion.button>
+      </div>
+    </div>
+  );
+}
+
+// Year in Review / "Bourbon Wrapped" Component
+interface YearStats {
+  year: number;
+  bottlesAdded: number;
+  bottlesOpened: number;
+  totalTasted: number;
+  favoriteSpirit: string;
+  topDistillery: string;
+  totalSpent: number;
+  rarestFind: string;
+  topRatedBottle: string;
+  mostActiveMonth: string;
+  triviaScore: number;
+  achievements: string[];
+}
+
+export function BourbonWrapped({ username, stats }: { username: string; stats: YearStats }) {
+  const [currentSlide, setCurrentSlide] = useState(0);
+
+  const slides = [
+    // Slide 1: Intro
+    {
+      content: (
+        <div className="text-center">
+          <motion.div
+            initial={{ scale: 0 }}
+            animate={{ scale: 1 }}
+            className="text-8xl mb-6"
+          >
+            🥃
+          </motion.div>
+          <h1 className="text-4xl font-bold text-white mb-4">
+            Your {stats.year} Bourbon Year
+          </h1>
+          <p className="text-amber-200 text-xl">
+            Let&apos;s see what you sipped...
+          </p>
+        </div>
+      ),
+    },
+    // Slide 2: Bottles
+    {
+      content: (
+        <div className="text-center">
+          <p className="text-amber-200 mb-4">You added</p>
+          <motion.p
+            initial={{ scale: 0 }}
+            animate={{ scale: 1 }}
+            className="text-8xl font-bold text-amber-400 mb-4"
+          >
+            {stats.bottlesAdded}
+          </motion.p>
+          <p className="text-amber-200 text-2xl mb-8">bottles to your collection</p>
+          <p className="text-amber-200/70">
+            And opened {stats.bottlesOpened} to share the experience
+          </p>
+        </div>
+      ),
+    },
+    // Slide 3: Top Spirit
+    {
+      content: (
+        <div className="text-center">
+          <p className="text-amber-200 mb-4">Your spirit of the year was</p>
+          <motion.p
+            initial={{ y: 50, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            className="text-4xl font-bold text-white mb-6"
+          >
+            {stats.favoriteSpirit}
+          </motion.p>
+          <p className="text-amber-200/70">
+            from {stats.topDistillery}
+          </p>
+        </div>
+      ),
+    },
+    // Slide 4: Rarest Find
+    {
+      content: (
+        <div className="text-center">
+          <div className="text-6xl mb-6">💎</div>
+          <p className="text-amber-200 mb-4">Your rarest find was</p>
+          <motion.p
+            initial={{ scale: 0.5, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            className="text-3xl font-bold text-amber-400"
+          >
+            {stats.rarestFind}
+          </motion.p>
+        </div>
+      ),
+    },
+    // Slide 5: Stats
+    {
+      content: (
+        <div className="text-center">
+          <p className="text-amber-200 mb-8">By the numbers</p>
+          <div className="grid grid-cols-2 gap-6">
+            <div>
+              <p className="text-5xl font-bold text-amber-400">${stats.totalSpent.toLocaleString()}</p>
+              <p className="text-amber-200/70">invested</p>
+            </div>
+            <div>
+              <p className="text-5xl font-bold text-amber-400">{stats.totalTasted}</p>
+              <p className="text-amber-200/70">spirits tasted</p>
+            </div>
+            <div>
+              <p className="text-5xl font-bold text-amber-400">{stats.triviaScore}</p>
+              <p className="text-amber-200/70">trivia points</p>
+            </div>
+            <div>
+              <p className="text-5xl font-bold text-amber-400">{stats.achievements.length}</p>
+              <p className="text-amber-200/70">achievements</p>
+            </div>
+          </div>
+        </div>
+      ),
+    },
+    // Slide 6: Share
+    {
+      content: (
+        <div className="text-center">
+          <h2 className="text-3xl font-bold text-white mb-6">
+            Share Your {stats.year} in Bourbon
+          </h2>
+          <p className="text-amber-200 mb-8">
+            Show the world your journey
+          </p>
+          <div className="flex justify-center gap-4">
+            <button className="px-6 py-3 bg-[#1DA1F2] text-white rounded-xl font-bold">
+              Share on Twitter
+            </button>
+            <button className="px-6 py-3 bg-amber-500 text-black rounded-xl font-bold">
+              Download Card
+            </button>
+          </div>
+        </div>
+      ),
+    },
+  ];
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-amber-900 via-stone-900 to-black flex items-center justify-center p-8">
+      <div className="max-w-lg w-full">
+        {/* Slide Content */}
+        <motion.div
+          key={currentSlide}
+          initial={{ opacity: 0, x: 100 }}
+          animate={{ opacity: 1, x: 0 }}
+          exit={{ opacity: 0, x: -100 }}
+          className="bg-stone-800/50 rounded-3xl border border-amber-500/30 p-12 min-h-[500px] flex items-center justify-center"
+        >
+          {slides[currentSlide].content}
+        </motion.div>
+
+        {/* Navigation */}
+        <div className="flex items-center justify-between mt-8">
+          <button
+            onClick={() => setCurrentSlide(Math.max(0, currentSlide - 1))}
+            disabled={currentSlide === 0}
+            className="px-6 py-2 text-amber-400 disabled:opacity-30"
+          >
+            Previous
+          </button>
+
+          {/* Dots */}
+          <div className="flex gap-2">
+            {slides.map((_, index) => (
+              <button
+                key={index}
+                onClick={() => setCurrentSlide(index)}
+                className={`w-2 h-2 rounded-full transition-all ${
+                  index === currentSlide ? 'bg-amber-400 w-6' : 'bg-stone-600'
+                }`}
+              />
+            ))}
+          </div>
+
+          <button
+            onClick={() => setCurrentSlide(Math.min(slides.length - 1, currentSlide + 1))}
+            disabled={currentSlide === slides.length - 1}
+            className="px-6 py-2 text-amber-400 disabled:opacity-30"
+          >
+            Next
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Export default page component
+export default function SharePage() {
+  const mockStats: CollectionStats = {
+    totalBottles: 47,
+    totalValue: 8450,
+    rareBottles: 12,
+    topCategory: 'bourbon',
+    favoriteDistillery: 'Buffalo Trace',
+    avgRating: 4.2,
+    joinDate: 'Jan 2024',
+    achievements: 23,
+  };
+
+  const mockYearStats: YearStats = {
+    year: 2024,
+    bottlesAdded: 47,
+    bottlesOpened: 18,
+    totalTasted: 156,
+    favoriteSpirit: "Blanton's Original",
+    topDistillery: 'Buffalo Trace Distillery',
+    totalSpent: 8450,
+    rarestFind: 'Pappy Van Winkle 15 Year',
+    topRatedBottle: "George T. Stagg",
+    mostActiveMonth: 'October',
+    triviaScore: 2450,
+    achievements: ['First Bottle', 'Bourbon Baron', 'Trivia Master', 'Social Sipper'],
+  };
+
+  const [activeTab, setActiveTab] = useState<'card' | 'wrapped'>('card');
+  const [selectedTheme, setSelectedTheme] = useState<'amber' | 'midnight' | 'vintage'>('amber');
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-amber-900 via-amber-800 to-stone-900">
       {/* Header */}
-      <header className="border-b border-purple-900/30 bg-black/50 backdrop-blur-sm sticky top-0 z-50">
-        <div className="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between">
-          <Link href="/" className="text-2xl font-bold text-amber-500">🥃 BarrelVerse</Link>
+      <header className="border-b border-amber-700/50 bg-black/20 backdrop-blur-sm">
+        <div className="container mx-auto px-4 py-4 flex items-center justify-between">
+          <a href="/" className="flex items-center gap-2">
+            <span className="text-2xl font-bold text-amber-400">🥃 BarrelVerse</span>
+          </a>
           <nav className="flex items-center gap-4">
-            <Link href="/collection" className="hover:text-amber-400 transition-colors">Collection</Link>
-            <Link href="/community" className="hover:text-amber-400 transition-colors">Community</Link>
+            <a href="/collection" className="text-amber-200 hover:text-amber-100">Collection</a>
+            <a href="/games" className="text-amber-200 hover:text-amber-100">Games</a>
           </nav>
         </div>
       </header>
 
-      <main className="max-w-6xl mx-auto px-4 py-8">
-        {/* Hero */}
-        <div className="text-center mb-8">
-          <div className="inline-block bg-gradient-to-r from-purple-600 to-pink-500 text-white px-4 py-1 rounded-full text-sm font-bold mb-4">
-            📸 SHARE YOUR COLLECTION
-          </div>
-          <h1 className="text-4xl font-bold mb-4">
-            Create <span className="text-purple-400">Viral Share Cards</span>
-          </h1>
-          <p className="text-xl text-gray-400 max-w-2xl mx-auto">
-            Generate beautiful, shareable cards showcasing your collection, 
-            achievements, and rare finds. Perfect for social media!
-          </p>
+      <main className="container mx-auto px-4 py-12">
+        <div className="text-center mb-12">
+          <h1 className="text-4xl font-bold text-white mb-4">Share Your Collection</h1>
+          <p className="text-amber-200 text-lg">Show off your spirits journey to the world</p>
         </div>
 
-        <div className="grid lg:grid-cols-2 gap-8">
-          {/* Card Preview */}
-          <div>
-            <h2 className="text-lg font-bold mb-4">Preview</h2>
-            <div
-              ref={cardRef}
-              className={`aspect-square rounded-2xl bg-gradient-to-br ${template.bg} p-8 relative overflow-hidden`}
-            >
-              {/* Background pattern */}
-              <div className="absolute inset-0 opacity-10">
-                <div className="absolute top-4 right-4 text-9xl rotate-12">🥃</div>
-                <div className="absolute bottom-4 left-4 text-6xl -rotate-12">🥃</div>
-              </div>
-              
-              <div className="relative z-10 h-full flex flex-col">
-                {/* Header */}
-                <div className="flex items-center justify-between mb-6">
-                  <div className="flex items-center gap-3">
-                    <div className="w-12 h-12 bg-white/20 rounded-full flex items-center justify-center text-2xl">
-                      👤
-                    </div>
-                    <div>
-                      <h3 className="font-bold text-lg">{MOCK_USER.name}</h3>
-                      <p className="text-sm opacity-75">Level {MOCK_USER.level} Collector</p>
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    <span className="text-2xl font-bold text-amber-400">🥃 BarrelVerse</span>
-                  </div>
-                </div>
-
-                {/* Stats Grid */}
-                <div className="grid grid-cols-2 gap-4 flex-1">
-                  {SHARE_STATS.map((stat, i) => (
-                    <div key={i} className="bg-black/30 rounded-xl p-4 flex flex-col justify-center">
-                      <span className="text-3xl mb-1">{stat.icon}</span>
-                      <span className="text-2xl font-bold">{stat.value}</span>
-                      <span className="text-sm opacity-75">{stat.label}</span>
-                    </div>
-                  ))}
-                </div>
-
-                {/* Badges */}
-                {showBadges && (
-                  <div className="mt-6 flex items-center justify-center gap-2">
-                    {MOCK_USER.badges.map((badge, i) => (
-                      <span key={i} className="text-3xl">{badge}</span>
-                    ))}
-                  </div>
-                )}
-
-                {/* Rarest Bottle */}
-                <div className="mt-4 bg-amber-500/20 rounded-lg p-3 text-center">
-                  <span className="text-xs opacity-75">RAREST BOTTLE</span>
-                  <p className="font-bold">{MOCK_USER.rarest}</p>
-                </div>
-
-                {/* Footer */}
-                <div className="mt-4 text-center text-sm opacity-50">
-                  barrelverse.com/u/{MOCK_USER.name.toLowerCase()}
-                </div>
-              </div>
-            </div>
-
-            {/* Quick Share Buttons */}
-            <div className="mt-6 flex gap-3">
-              <button
-                onClick={() => shareToSocial('facebook')}
-                className="flex-1 bg-blue-600 hover:bg-blue-500 py-3 rounded-lg font-semibold flex items-center justify-center gap-2"
-              >
-                📘 Facebook
-              </button>
-              <button
-                onClick={() => shareToSocial('twitter')}
-                className="flex-1 bg-sky-500 hover:bg-sky-400 py-3 rounded-lg font-semibold flex items-center justify-center gap-2"
-              >
-                🐦 Twitter
-              </button>
-              <button
-                onClick={() => shareToSocial('reddit')}
-                className="flex-1 bg-orange-600 hover:bg-orange-500 py-3 rounded-lg font-semibold flex items-center justify-center gap-2"
-              >
-                🤖 Reddit
-              </button>
-            </div>
-          </div>
-
-          {/* Customization Options */}
-          <div className="space-y-6">
-            {/* Card Type */}
-            <div className="bg-stone-800/50 rounded-xl p-6 border border-stone-700/50">
-              <h3 className="font-bold mb-4">Card Type</h3>
-              <div className="grid grid-cols-2 gap-3">
-                {[
-                  { id: 'collection', name: 'Collection Stats', icon: '📊' },
-                  { id: 'bottle', name: 'Single Bottle', icon: '🥃' },
-                  { id: 'achievement', name: 'Achievement', icon: '🏆' },
-                  { id: 'stats', name: 'Year in Review', icon: '📅' }
-                ].map((type) => (
-                  <button
-                    key={type.id}
-                    onClick={() => setCardType(type.id as typeof cardType)}
-                    className={`p-4 rounded-lg text-left transition-all ${
-                      cardType === type.id
-                        ? 'bg-purple-600 border-2 border-purple-400'
-                        : 'bg-stone-700/50 hover:bg-stone-600/50 border-2 border-transparent'
-                    }`}
-                  >
-                    <span className="text-2xl">{type.icon}</span>
-                    <p className="font-medium mt-1">{type.name}</p>
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Template Selection */}
-            <div className="bg-stone-800/50 rounded-xl p-6 border border-stone-700/50">
-              <h3 className="font-bold mb-4">Style Template</h3>
-              <div className="grid grid-cols-3 gap-3">
-                {CARD_TEMPLATES.map((t) => (
-                  <button
-                    key={t.id}
-                    onClick={() => setSelectedTemplate(t.id)}
-                    className={`p-3 rounded-lg transition-all ${
-                      selectedTemplate === t.id
-                        ? 'ring-2 ring-purple-400'
-                        : ''
-                    }`}
-                  >
-                    <div className={`w-full aspect-video rounded bg-gradient-to-br ${t.bg}`} />
-                    <p className="text-xs mt-2 text-center">{t.name}</p>
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Options */}
-            <div className="bg-stone-800/50 rounded-xl p-6 border border-stone-700/50">
-              <h3 className="font-bold mb-4">Options</h3>
-              <div className="space-y-4">
-                <label className="flex items-center justify-between cursor-pointer">
-                  <span>Show Badges</span>
-                  <button
-                    onClick={() => setShowBadges(!showBadges)}
-                    className={`w-12 h-6 rounded-full transition-colors ${
-                      showBadges ? 'bg-purple-600' : 'bg-stone-600'
-                    }`}
-                  >
-                    <div className={`w-5 h-5 bg-white rounded-full transition-transform ${
-                      showBadges ? 'translate-x-6' : 'translate-x-0.5'
-                    }`} />
-                  </button>
-                </label>
-                <label className="flex items-center justify-between cursor-pointer">
-                  <span>Show Value</span>
-                  <button
-                    onClick={() => setShowValue(!showValue)}
-                    className={`w-12 h-6 rounded-full transition-colors ${
-                      showValue ? 'bg-purple-600' : 'bg-stone-600'
-                    }`}
-                  >
-                    <div className={`w-5 h-5 bg-white rounded-full transition-transform ${
-                      showValue ? 'translate-x-6' : 'translate-x-0.5'
-                    }`} />
-                  </button>
-                </label>
-              </div>
-            </div>
-
-            {/* Generate Button */}
-            <button
-              onClick={generateCard}
-              disabled={isGenerating}
-              className={`w-full py-4 rounded-xl font-bold text-lg transition-all ${
-                isGenerating
-                  ? 'bg-stone-700 cursor-wait'
-                  : 'bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500'
-              }`}
-            >
-              {isGenerating ? (
-                <span className="flex items-center justify-center gap-2">
-                  <span className="animate-spin">⏳</span> Generating...
-                </span>
-              ) : (
-                <span className="flex items-center justify-center gap-2">
-                  📸 Download Card
-                </span>
-              )}
-            </button>
-
-            {/* Share Message Templates */}
-            <div className="bg-stone-800/50 rounded-xl p-6 border border-stone-700/50">
-              <h3 className="font-bold mb-4">📝 Share Templates</h3>
-              <div className="space-y-3">
-                {[
-                  "Just hit 100+ bottles in my collection! 🥃 Check out my stats on BarrelVerse!",
-                  "My whiskey collection is now worth more than my car 😂 Track yours at BarrelVerse!",
-                  "Finally found my white whale! 🐋🥃 #BourbonHunting",
-                  "Who else is tracking their collection? Found the perfect app!"
-                ].map((msg, i) => (
-                  <button
-                    key={i}
-                    onClick={() => navigator.clipboard.writeText(msg)}
-                    className="w-full text-left bg-stone-700/50 hover:bg-stone-600/50 rounded-lg p-3 text-sm transition-colors"
-                  >
-                    {msg}
-                    <span className="text-xs text-gray-500 block mt-1">Click to copy</span>
-                  </button>
-                ))}
-              </div>
-            </div>
-          </div>
+        {/* Tab Switcher */}
+        <div className="flex justify-center gap-4 mb-12">
+          <button
+            onClick={() => setActiveTab('card')}
+            className={`px-6 py-3 rounded-xl font-bold transition-all ${
+              activeTab === 'card'
+                ? 'bg-amber-500 text-black'
+                : 'bg-stone-700 text-white hover:bg-stone-600'
+            }`}
+          >
+            <Camera className="w-5 h-5 inline mr-2" />
+            Collection Card
+          </button>
+          <button
+            onClick={() => setActiveTab('wrapped')}
+            className={`px-6 py-3 rounded-xl font-bold transition-all ${
+              activeTab === 'wrapped'
+                ? 'bg-amber-500 text-black'
+                : 'bg-stone-700 text-white hover:bg-stone-600'
+            }`}
+          >
+            <Star className="w-5 h-5 inline mr-2" />
+            Year Wrapped
+          </button>
         </div>
 
-        {/* Inspiration Gallery */}
-        <div className="mt-16">
-          <h2 className="text-2xl font-bold mb-6">🔥 Community Cards</h2>
-          <div className="grid md:grid-cols-4 gap-4">
-            {[1, 2, 3, 4].map((i) => (
-              <div key={i} className="aspect-square bg-gradient-to-br from-amber-900/50 to-stone-800 rounded-xl flex items-center justify-center">
-                <span className="text-4xl opacity-50">📸</span>
-              </div>
-            ))}
+        {activeTab === 'card' && (
+          <div className="flex flex-col items-center">
+            {/* Theme Selector */}
+            <div className="flex gap-4 mb-8">
+              {(['amber', 'midnight', 'vintage'] as const).map((theme) => (
+                <button
+                  key={theme}
+                  onClick={() => setSelectedTheme(theme)}
+                  className={`px-4 py-2 rounded-lg font-medium capitalize transition-all ${
+                    selectedTheme === theme
+                      ? 'bg-amber-500 text-black'
+                      : 'bg-stone-700 text-white hover:bg-stone-600'
+                  }`}
+                >
+                  {theme}
+                </button>
+              ))}
+            </div>
+
+            <ShareableCollectionCard
+              username="BourbonMaster"
+              stats={mockStats}
+              theme={selectedTheme}
+            />
           </div>
-        </div>
+        )}
+
+        {activeTab === 'wrapped' && (
+          <BourbonWrapped username="BourbonMaster" stats={mockYearStats} />
+        )}
       </main>
     </div>
-  )
+  );
 }
