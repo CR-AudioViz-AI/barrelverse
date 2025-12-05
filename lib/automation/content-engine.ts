@@ -586,6 +586,74 @@ export async function weeklyContentGeneration(): Promise<{
 }
 
 // ============================================
+// BARRELVERSE CONTENT ENGINE CLASS
+// ============================================
+
+interface CycleOptions {
+  spirits?: number;
+  history?: number;
+  trivia?: number;
+  cocktails?: number;
+  courses?: number;
+}
+
+export class BarrelVerseContentEngine {
+  /**
+   * Run a content generation cycle
+   */
+  async runCycle(options: CycleOptions): Promise<Record<string, number>> {
+    const stats: Record<string, number> = {};
+
+    // Generate spirits
+    if (options.spirits && options.spirits > 0) {
+      const spiritsResult = await expandSpiritsDatabase();
+      stats.spirits = spiritsResult.added;
+    }
+
+    // Generate trivia
+    if (options.trivia && options.trivia > 0) {
+      stats.trivia = await generateDailyTrivia(options.trivia);
+    }
+
+    // Generate courses
+    if (options.courses && options.courses > 0) {
+      for (let i = 0; i < options.courses; i++) {
+        const success = await generateWeeklyCourse();
+        stats.courses = (stats.courses || 0) + (success ? 1 : 0);
+      }
+    }
+
+    // Generate history/museum content
+    if (options.history && options.history > 0) {
+      stats.history = await expandMuseumContent();
+    }
+
+    return stats;
+  }
+
+  /**
+   * Run daily refresh
+   */
+  async dailyRefresh(): Promise<ReturnType<typeof dailyContentRefresh>> {
+    return dailyContentRefresh();
+  }
+
+  /**
+   * Run weekly generation
+   */
+  async weeklyGenerate(): Promise<ReturnType<typeof weeklyContentGeneration>> {
+    return weeklyContentGeneration();
+  }
+
+  /**
+   * Get new content counts
+   */
+  async getNewCounts(): Promise<Record<string, number>> {
+    return getNewContentCounts();
+  }
+}
+
+// ============================================
 // EXPORTS
 // ============================================
 
@@ -597,5 +665,6 @@ export default {
   generateWeeklyCourse,
   expandMuseumContent,
   dailyContentRefresh,
-  weeklyContentGeneration
+  weeklyContentGeneration,
+  BarrelVerseContentEngine
 };
