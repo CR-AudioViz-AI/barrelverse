@@ -1,47 +1,33 @@
+// components/ErrorBoundary.tsx
 'use client';
 
-/**
- * BARRELVERSE ERROR BOUNDARY
- * ==========================
- * Catches errors, auto-creates tickets, and provides user-friendly recovery
- * 
- * Features:
- * - Catches all unhandled errors
- * - Auto-creates support tickets
- * - Shows user-friendly error message
- * - Provides recovery options
- * - Notifies user of ticket creation
- * 
- * Built by Claude + Roy Henderson
- * CR AudioViz AI, LLC - BarrelVerse
- * 2025-12-04
- */
-
 import React, { Component, ErrorInfo, ReactNode } from 'react';
-import { AlertTriangle, RefreshCw, Home, MessageCircle, Bug } from 'lucide-react';
+import { AlertTriangle, RefreshCw, Home, MessageSquare } from 'lucide-react';
+import Link from 'next/link';
 
 interface Props {
   children: ReactNode;
   fallback?: ReactNode;
+  onError?: (error: Error, errorInfo: ErrorInfo) => void;
 }
 
 interface State {
   hasError: boolean;
   error: Error | null;
   errorInfo: ErrorInfo | null;
+  ticketSubmitted: boolean;
   ticketId: string | null;
-  isReporting: boolean;
 }
 
-export default class ErrorBoundary extends Component<Props, State> {
+class ErrorBoundary extends Component<Props, State> {
   constructor(props: Props) {
     super(props);
     this.state = {
       hasError: false,
       error: null,
       errorInfo: null,
-      ticketId: null,
-      isReporting: false
+      ticketSubmitted: false,
+      ticketId: null
     };
   }
 
@@ -49,49 +35,54 @@ export default class ErrorBoundary extends Component<Props, State> {
     return { hasError: true, error };
   }
 
-  componentDidCatch(error: Error, errorInfo: ErrorInfo) {
+  async componentDidCatch(error: Error, errorInfo: ErrorInfo) {
     this.setState({ errorInfo });
-    this.reportError(error, errorInfo);
-  }
+    
+    // Call optional error handler
+    this.props.onError?.(error, errorInfo);
 
-  async reportError(error: Error, errorInfo: ErrorInfo) {
-    this.setState({ isReporting: true });
-
+    // Auto-submit error ticket
     try {
-      const response = await fetch('/api/errors/report', {
+      const response = await fetch('/api/support/auto-ticket', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          error: {
-            name: error.name,
-            message: error.message,
-            stack: error.stack
-          },
-          errorInfo: {
-            componentStack: errorInfo.componentStack
-          },
-          context: {
-            url: typeof window !== 'undefined' ? window.location.href : '',
-            userAgent: typeof navigator !== 'undefined' ? navigator.userAgent : '',
-            timestamp: new Date().toISOString()
+          error_message: error.message,
+          error_stack: error.stack,
+          component_name: errorInfo.componentStack?.split('\n')[1]?.trim() || 'Unknown',
+          url: typeof window !== 'undefined' ? window.location.href : '',
+          user_agent: typeof navigator !== 'undefined' ? navigator.userAgent : '',
+          additional_context: {
+            componentStack: errorInfo.componentStack?.substring(0, 1000)
           }
         })
       });
 
-      const data = await response.json();
-      
-      if (data.ticketId) {
-        this.setState({ ticketId: data.ticketId });
+      if (response.ok) {
+        const data = await response.json();
+        this.setState({ 
+          ticketSubmitted: true, 
+          ticketId: data.ticket_id 
+        });
       }
-    } catch (reportError) {
-      console.error('Failed to report error:', reportError);
-    } finally {
-      this.setState({ isReporting: false });
+    } catch (e) {
+      console.error('Failed to submit error ticket:', e);
+    }
+
+    // Log to console in development
+    if (process.env.NODE_ENV === 'development') {
+      console.error('ErrorBoundary caught an error:', error, errorInfo);
     }
   }
 
   handleRetry = () => {
-    this.setState({ hasError: false, error: null, errorInfo: null });
+    this.setState({
+      hasError: false,
+      error: null,
+      errorInfo: null,
+      ticketSubmitted: false,
+      ticketId: null
+    });
   };
 
   render() {
@@ -101,84 +92,74 @@ export default class ErrorBoundary extends Component<Props, State> {
       }
 
       return (
-        <div className="min-h-screen bg-gradient-to-b from-stone-900 to-black flex items-center justify-center p-4">
-          <div className="max-w-lg w-full bg-stone-900 border border-stone-700 rounded-2xl p-8 text-center">
+        <div className="min-h-[400px] flex items-center justify-center p-8">
+          <div className="max-w-md w-full bg-stone-900 border border-stone-700 rounded-2xl p-8 text-center">
             {/* Error Icon */}
-            <div className="w-20 h-20 mx-auto mb-6 bg-red-900/30 rounded-full flex items-center justify-center">
-              <AlertTriangle className="w-10 h-10 text-red-500" />
+            <div className="w-16 h-16 bg-red-500/20 rounded-full flex items-center justify-center mx-auto mb-6">
+              <AlertTriangle className="w-8 h-8 text-red-400" />
             </div>
 
             {/* Title */}
-            <h1 className="text-2xl font-bold text-white mb-2">
+            <h2 className="text-2xl font-bold text-white mb-2">
               Oops! Something went wrong
-            </h1>
-
-            {/* Description */}
+            </h2>
+            
             <p className="text-stone-400 mb-6">
-              Don't worry - we've been automatically notified and are working on it.
-              {this.state.ticketId && (
-                <span className="block mt-2 text-amber-500">
-                  Ticket #{this.state.ticketId.slice(0, 8)} created
-                </span>
-              )}
+              We've encountered an unexpected error. Don't worry - our team has been automatically notified.
             </p>
 
-            {/* Status */}
-            {this.state.isReporting && (
-              <div className="flex items-center justify-center gap-2 text-stone-500 mb-6">
-                <div className="w-4 h-4 border-2 border-amber-500 border-t-transparent rounded-full animate-spin" />
-                <span>Reporting to Javari...</span>
+            {/* Ticket Status */}
+            {this.state.ticketSubmitted && (
+              <div className="bg-green-500/10 border border-green-500/20 rounded-lg p-4 mb-6">
+                <p className="text-green-400 text-sm">
+                  ✅ Error report submitted automatically
+                  {this.state.ticketId && (
+                    <span className="block text-xs mt-1 text-green-500/70">
+                      Ticket #{this.state.ticketId.substring(0, 8)}
+                    </span>
+                  )}
+                </p>
+              </div>
+            )}
+
+            {/* Error Details (Development Only) */}
+            {process.env.NODE_ENV === 'development' && this.state.error && (
+              <div className="bg-stone-800 rounded-lg p-4 mb-6 text-left">
+                <p className="text-red-400 text-sm font-mono break-all">
+                  {this.state.error.message}
+                </p>
               </div>
             )}
 
             {/* Actions */}
-            <div className="space-y-3">
+            <div className="flex flex-col sm:flex-row gap-3 justify-center">
               <button
                 onClick={this.handleRetry}
-                className="w-full flex items-center justify-center gap-2 bg-amber-600 hover:bg-amber-500 
-                  text-white font-semibold py-3 px-6 rounded-lg transition-colors"
+                className="flex items-center justify-center gap-2 px-6 py-3 bg-amber-600 hover:bg-amber-500 text-white rounded-lg font-medium transition-colors"
               >
-                <RefreshCw className="w-5 h-5" />
+                <RefreshCw className="w-4 h-4" />
                 Try Again
               </button>
-
-              <button
-                onClick={() => window.location.href = '/'}
-                className="w-full flex items-center justify-center gap-2 bg-stone-700 hover:bg-stone-600 
-                  text-white font-semibold py-3 px-6 rounded-lg transition-colors"
+              
+              <Link
+                href="/"
+                className="flex items-center justify-center gap-2 px-6 py-3 bg-stone-700 hover:bg-stone-600 text-white rounded-lg font-medium transition-colors"
               >
-                <Home className="w-5 h-5" />
+                <Home className="w-4 h-4" />
                 Go Home
-              </button>
-
-              <button
-                onClick={() => window.location.href = '/support'}
-                className="w-full flex items-center justify-center gap-2 bg-stone-800 hover:bg-stone-700 
-                  text-stone-300 py-3 px-6 rounded-lg transition-colors"
-              >
-                <MessageCircle className="w-5 h-5" />
-                Contact Support
-              </button>
+              </Link>
             </div>
 
-            {/* Error Details (collapsible) */}
-            <details className="mt-6 text-left">
-              <summary className="text-stone-500 text-sm cursor-pointer hover:text-stone-400 flex items-center gap-2">
-                <Bug className="w-4 h-4" />
-                Technical Details
-              </summary>
-              <div className="mt-2 bg-stone-800 rounded-lg p-4 text-xs text-stone-400 overflow-auto max-h-48">
-                <p className="font-mono text-red-400">{this.state.error?.message}</p>
-                {this.state.error?.stack && (
-                  <pre className="mt-2 whitespace-pre-wrap">{this.state.error.stack}</pre>
-                )}
-              </div>
-            </details>
-
-            {/* Reassurance */}
-            <p className="mt-6 text-xs text-stone-500">
-              🤖 Javari is already analyzing this issue and will notify you when it's fixed.
-            </p>
+            {/* Contact Support */}
+            <div className="mt-6 pt-6 border-t border-stone-700">
+              <Link 
+                href="/help"
+                className="inline-flex items-center gap-2 text-amber-400 hover:text-amber-300 text-sm"
+              >
+                <MessageSquare className="w-4 h-4" />
+                Contact Support
+              </Link>
+            </div>
           </div>
         </div>
       );
@@ -188,87 +169,4 @@ export default class ErrorBoundary extends Component<Props, State> {
   }
 }
 
-// ============================================
-// Global Error Handler (for uncaught errors)
-// ============================================
-
-export function initGlobalErrorHandler() {
-  if (typeof window === 'undefined') return;
-
-  // Unhandled promise rejections
-  window.addEventListener('unhandledrejection', (event) => {
-    reportGlobalError({
-      type: 'unhandledrejection',
-      message: event.reason?.message || 'Unhandled Promise Rejection',
-      stack: event.reason?.stack
-    });
-  });
-
-  // Uncaught errors
-  window.addEventListener('error', (event) => {
-    reportGlobalError({
-      type: 'uncaught',
-      message: event.message,
-      filename: event.filename,
-      lineno: event.lineno,
-      colno: event.colno
-    });
-  });
-}
-
-async function reportGlobalError(errorData: any) {
-  try {
-    await fetch('/api/errors/report', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        error: errorData,
-        context: {
-          url: window.location.href,
-          userAgent: navigator.userAgent,
-          timestamp: new Date().toISOString(),
-          global: true
-        }
-      })
-    });
-  } catch (e) {
-    console.error('Failed to report global error:', e);
-  }
-}
-
-// ============================================
-// Error Report API Route
-// ============================================
-
-/*
-// /api/errors/report/route.ts
-
-import { NextRequest, NextResponse } from 'next/server';
-import { handleApplicationError } from '@/lib/automation/support-system';
-
-export async function POST(request: NextRequest) {
-  try {
-    const body = await request.json();
-    
-    const error = new Error(body.error.message);
-    error.name = body.error.name || 'Error';
-    error.stack = body.error.stack;
-
-    await handleApplicationError(error, {
-      userId: body.userId,
-      url: body.context.url,
-      userAgent: body.context.userAgent,
-      component: body.errorInfo?.componentStack?.split('\n')[1]?.trim(),
-      userAction: body.context.userAction
-    });
-
-    return NextResponse.json({ 
-      success: true, 
-      ticketId: 'auto-generated-id' // Would come from handleApplicationError
-    });
-  } catch (error) {
-    console.error('Error report failed:', error);
-    return NextResponse.json({ error: 'Report failed' }, { status: 500 });
-  }
-}
-*/
+export default ErrorBoundary;
