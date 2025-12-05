@@ -304,13 +304,11 @@ async function grantSubscriptionBonus(userId: string, tierId: string): Promise<v
   // Grant badge
   await supabase
     .from('bv_user_achievements')
-    .insert({
+    .upsert({
       user_id: userId,
       achievement_id: bonus.badge,
       earned_at: new Date().toISOString()
-    })
-    .onConflict('user_id,achievement_id')
-    .ignore();
+    }, { onConflict: 'user_id,achievement_id', ignoreDuplicates: true });
 }
 
 // ============================================
@@ -573,4 +571,5 @@ export default {
   generateAffiliateLink,
   trackAffiliateClick,
 };
+
 
