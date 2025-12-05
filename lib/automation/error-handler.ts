@@ -2,16 +2,16 @@
  * AUTONOMOUS ERROR HANDLER
  * ========================
  * Global error handling system that automatically creates
- * support tickets from errors, integrates with the
- * self-healing system, and tracks error patterns.
+ * support tickets from errors.
  * 
  * CR AudioViz AI, LLC - BarrelVerse
- * Timestamp: 2025-12-05 (Fixed)
+ * Timestamp: 2025-12-05 (Fixed v2)
  */
 
 import { createClient } from '@supabase/supabase-js'
 
-let supabaseInstance: ReturnType<typeof createClient> | null = null
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+let supabaseInstance: any = null
 
 function getSupabase() {
   if (!supabaseInstance) {
@@ -31,12 +31,12 @@ interface ErrorDetails {
   source: string
   url?: string
   userId?: string
-  metadata?: Record<string, any>
+  metadata?: Record<string, unknown>
 }
 
 // Recent errors cache for deduplication
 const recentErrors: Record<string, number> = {}
-const ERROR_DEDUP_WINDOW = 300000 // 5 minutes
+const ERROR_DEDUP_WINDOW = 300000
 
 export async function reportError(error: Error | string, details: Partial<ErrorDetails> = {}) {
   const supabase = getSupabase()
@@ -44,30 +44,24 @@ export async function reportError(error: Error | string, details: Partial<ErrorD
   const errorMessage = typeof error === 'string' ? error : error.message
   const errorStack = typeof error === 'string' ? undefined : error.stack
   
-  // Create dedup key
   const dedupKey = `${errorMessage}-${details.source || 'unknown'}`
   const lastReported = recentErrors[dedupKey]
   
-  // Skip if reported recently
   if (lastReported && Date.now() - lastReported < ERROR_DEDUP_WINDOW) {
-    console.log('[ErrorHandler] Skipping duplicate error:', errorMessage.substring(0, 50))
+    console.log('[ErrorHandler] Skipping duplicate error')
     return null
   }
   
-  // Update dedup cache
   recentErrors[dedupKey] = Date.now()
   
-  // Clean old entries (using Object.keys instead of Map.entries)
   Object.keys(recentErrors).forEach(key => {
     if (Date.now() - recentErrors[key] > ERROR_DEDUP_WINDOW) {
       delete recentErrors[key]
     }
   })
   
-  // Classify severity
   const severity = classifySeverity(errorMessage, errorStack)
   
-  // Create ticket
   const ticket = {
     ticket_type: 'error',
     title: truncate(errorMessage, 200),
@@ -97,14 +91,12 @@ export async function reportError(error: Error | string, details: Partial<ErrorD
       return null
     }
     
-    console.log(`[ErrorHandler] Created ticket ${data.id} - Severity: ${severity}`)
+    console.log(`[ErrorHandler] Created ticket ${data?.id} - Severity: ${severity}`)
     
-    // For critical errors, queue investigation
     if (severity === 'critical') {
-      await queueInvestigation(data.id, errorMessage, details)
+      await queueInvestigation(data?.id, errorMessage, details)
     }
     
-    // Record error metric
     await recordErrorMetric(severity, details.source)
     
     return data
@@ -114,11 +106,11 @@ export async function reportError(error: Error | string, details: Partial<ErrorD
   }
 }
 
-export async function reportUserError(message: string, userId?: string, context?: Record<string, any>) {
+export async function reportUserError(message: string, userId?: string, context?: Record<string, unknown>) {
   return reportError(message, { source: 'user-facing', userId, metadata: context })
 }
 
-export async function reportApiError(endpoint: string, error: Error | string, request?: { method?: string; body?: any }) {
+export async function reportApiError(endpoint: string, error: Error | string, request?: { method?: string; body?: unknown }) {
   return reportError(error, {
     source: 'api',
     url: endpoint,
@@ -175,7 +167,7 @@ async function recordErrorMetric(severity: Severity, source?: string) {
     metric_type: `errors_${severity}`,
     metric_value: 1,
     metric_details: { source }
-  }).catch(() => {})
+  }).catch(() => { /* ignore */ })
 }
 
 function truncate(str: string, length: number): string {
