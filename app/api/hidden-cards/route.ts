@@ -1,5 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+import { createServerSupabaseClient } from '@/lib/supabase/server';
+
+// Define types for the API
+interface QueueTask {
+  status: string;
+}
 
 // Hidden card discovery endpoint
 export async function POST(request: NextRequest) {
@@ -13,7 +18,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const supabase = createClient();
+    const supabase = await createServerSupabaseClient();
 
     // Check if user already has this card
     const { data: existing } = await supabase
@@ -84,12 +89,17 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Update user XP and credits
-    await supabase.rpc('add_user_rewards', {
-      p_user_id: userId,
-      p_xp: card.xp_reward,
-      p_credits: card.credit_reward
-    });
+    // Update user XP and credits (if RPC exists)
+    try {
+      await supabase.rpc('add_user_rewards', {
+        p_user_id: userId,
+        p_xp: card.xp_reward,
+        p_credits: card.credit_reward
+      });
+    } catch (rpcError) {
+      // RPC may not exist yet, just log it
+      console.log('Rewards RPC not available:', rpcError);
+    }
 
     // Log the discovery event
     await supabase
@@ -137,7 +147,7 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const supabase = createClient();
+    const supabase = await createServerSupabaseClient();
 
     // Get user's cards
     const { data: userCards, error } = await supabase
@@ -167,9 +177,9 @@ export async function GET(request: NextRequest) {
     const stats = {
       totalDiscovered: userCards?.length || 0,
       totalAvailable: allCards?.length || 0,
-      xpEarned: userCards?.reduce((sum, c) => sum + (c.card?.xp_reward || 0), 0) || 0,
-      creditsEarned: userCards?.reduce((sum, c) => sum + (c.card?.credit_reward || 0), 0) || 0,
-      foilCount: userCards?.filter(c => c.is_foil).length || 0
+      xpEarned: userCards?.reduce((sum: number, c: { card?: { xp_reward?: number } }) => sum + (c.card?.xp_reward || 0), 0) || 0,
+      creditsEarned: userCards?.reduce((sum: number, c: { card?: { credit_reward?: number } }) => sum + (c.card?.credit_reward || 0), 0) || 0,
+      foilCount: userCards?.filter((c: { is_foil?: boolean }) => c.is_foil).length || 0
     };
 
     return NextResponse.json({
@@ -187,7 +197,7 @@ export async function GET(request: NextRequest) {
   }
 }
 
-async function getNextInstanceNumber(supabase: any, cardId: string): Promise<number> {
+async function getNextInstanceNumber(supabase: Awaited<ReturnType<typeof createServerSupabaseClient>>, cardId: string): Promise<number> {
   const { count } = await supabase
     .from('user_digital_cards')
     .select('id', { count: 'exact' })
