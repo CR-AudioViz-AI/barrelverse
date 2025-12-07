@@ -11,11 +11,17 @@
  * - Metrics and analytics
  * 
  * CR AudioViz AI, LLC - BarrelVerse
- * Timestamp: 2025-12-05
+ * Timestamp: 2025-12-06
  */
 
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+
+// Define types
+interface TicketStats {
+  status: string;
+  severity: string;
+}
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const supabase: any = createClient(
@@ -56,7 +62,7 @@ export async function GET(request: NextRequest) {
       by_severity: {} as Record<string, number>
     }
 
-    stats?.forEach(t => {
+    ;(stats as TicketStats[] | null)?.forEach((t: TicketStats) => {
       summary.by_status[t.status] = (summary.by_status[t.status] || 0) + 1
       summary.by_severity[t.severity] = (summary.by_severity[t.severity] || 0) + 1
     })
@@ -121,7 +127,7 @@ export async function PATCH(request: NextRequest) {
     const body = await request.json()
     const { id, status, assigned_to } = body
 
-    const updates: Record<string, any> = {
+    const updates: Record<string, unknown> = {
       updated_at: new Date().toISOString()
     }
     
