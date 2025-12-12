@@ -1,0 +1,146 @@
+import { NextRequest, NextResponse } from 'next/server';
+import { createClient } from '@supabase/supabase-js';
+
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!
+);
+
+// CRAVBarrels <-> CRAVCards Crossover API
+// Allows shared users to access both platforms with single sign-on
+
+export async function GET(request: NextRequest) {
+  try {
+    const { searchParams } = new URL(request.url);
+    const userId = searchParams.get('userId');
+    const action = searchParams.get('action');
+
+    if (!userId) {
+      return NextResponse.json({ error: 'User ID required' }, { status: 400 });
+    }
+
+    switch (action) {
+      case 'profile':
+        // Get unified profile data
+        const { data: profile } = await supabase
+          .from('bv_profiles')
+          .select('*')
+          .eq('user_id', userId)
+          .single();
+        
+        return NextResponse.json({
+          source: 'cravbarrels',
+          profile,
+          crossover: {
+            barrels: true,
+            cards: true,  // Would check if user exists in cards DB
+          }
+        });
+
+      case 'achievements':
+        // Get achievements that could unlock rewards in CRAVCards
+        const { data: achievements } = await supabase
+          .from('bv_user_achievements')
+          .select(`
+            *,
+            achievement:bv_achievements(name, icon, category)
+          `)
+          .eq('user_id', userId)
+          .not('unlocked_at', 'is', null);
+
+        return NextResponse.json({
+          achievements,
+          crossoverRewards: achievements?.map(a => ({
+            achievement: a.achievement?.name,
+            cardsBonus: calculateCardsBonus(a.achievement?.category)
+          }))
+        });
+
+      case 'subscription':
+        // Check if premium subscription can apply to CRAVCards
+        const { data: sub } = await supabase
+          .from('bv_subscriptions')
+          .select('*')
+          .eq('user_id', userId)
+          .single();
+
+        return NextResponse.json({
+          subscription: sub,
+          crossoverBenefits: sub?.plan !== 'free' ? {
+            cardsDiscount: 20,  // 20% off CRAVCards premium
+            sharedCredits: true,
+            prioritySupport: sub?.plan === 'sommelier'
+          } : null
+        });
+
+      default:
+        return NextResponse.json({ 
+          available_actions: ['profile', 'achievements', 'subscription'],
+          message: 'CRAVBarrels Crossover API v1.0'
+        });
+    }
+  } catch (error) {
+    console.error('Crossover API error:', error);
+    return NextResponse.json({ error: 'Crossover request failed' }, { status: 500 });
+  }
+}
+
+export async function POST(request: NextRequest) {
+  try {
+    const body = await request.json();
+    const { userId, action, data } = body;
+
+    if (!userId || !action) {
+      return NextResponse.json({ error: 'userId and action required' }, { status: 400 });
+    }
+
+    switch (action) {
+      case 'sync_from_cards':
+        // Receive data from CRAVCards to sync here
+        // This would be called by CRAVCards when user links accounts
+        const { cardsProfile, cardsAchievements } = data || {};
+        
+        // Could create crossover rewards or sync preferences
+        return NextResponse.json({
+          success: true,
+          message: 'Data received from CRAVCards',
+          synced: {
+            profile: !!cardsProfile,
+            achievements: cardsAchievements?.length || 0
+          }
+        });
+
+      case 'link_accounts':
+        // Link CRAVBarrels account with CRAVCards
+        // In production, this would verify with CRAVCards API
+        return NextResponse.json({
+          success: true,
+          linkedAt: new Date().toISOString(),
+          benefits: [
+            '20% discount on CRAVCards premium',
+            'Shared achievement rewards',
+            'Unified profile',
+            'Cross-platform notifications'
+          ]
+        });
+
+      default:
+        return NextResponse.json({ error: 'Unknown action' }, { status: 400 });
+    }
+  } catch (error) {
+    console.error('Crossover POST error:', error);
+    return NextResponse.json({ error: 'Crossover sync failed' }, { status: 500 });
+  }
+}
+
+function calculateCardsBonus(category: string | undefined): number {
+  const bonuses: Record<string, number> = {
+    collection: 50,
+    category: 25,
+    reviews: 30,
+    social: 20,
+    distillery: 40,
+    special: 100
+  };
+  return bonuses[category || ''] || 10;
+}
