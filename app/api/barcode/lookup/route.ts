@@ -135,11 +135,15 @@ export async function POST(request: NextRequest) {
 
     // Award points to contributor (if user system exists)
     if (userId) {
-      await supabase.rpc('award_contribution_points', { 
-        user_id: userId, 
-        points: 10,
-        reason: 'Added new spirit via barcode scan'
-      }).catch(() => {}) // Ignore if function doesn't exist
+      try {
+        await supabase.rpc('award_contribution_points', { 
+          user_id: userId, 
+          points: 10,
+          reason: 'Added new spirit via barcode scan'
+        })
+      } catch {
+        // Ignore if function doesn't exist
+      }
     }
 
     return NextResponse.json({
