@@ -1,0 +1,158 @@
+// app/api/ai/sommelier/route.ts
+import { NextRequest, NextResponse } from 'next/server';
+import { createClient } from '@supabase/supabase-js';
+import Anthropic from '@anthropic-ai/sdk';
+
+const anthropic = new Anthropic({
+  apiKey: process.env.ANTHROPIC_API_KEY,
+});
+
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!
+);
+
+const SYSTEM_PROMPT = `You are an expert AI Sommelier for BarrelVerse, specializing in whiskey, bourbon, scotch, rum, tequila, gin, vodka, and all spirits. You have extensive knowledge of:
+
+- Distilleries worldwide and their histories
+- Tasting notes, flavor profiles, and production methods
+- Food pairings for different spirits
+- Cocktail recipes and mixology techniques
+- Price points and value recommendations
+- Rare and allocated bottles
+- Collection building and investment advice
+
+Your personality:
+- Warm and approachable, like a knowledgeable bartender
+- Passionate about helping people discover new spirits
+- Honest about quality regardless of price
+- Respectful of all experience levels from beginners to experts
+
+Guidelines:
+- Always recommend responsibly
+- If asked about health effects, encourage moderation
+- Be specific with recommendations (give actual bottle names)
+- Explain WHY you're recommending something
+- Consider the user's budget when mentioned
+- Offer alternatives at different price points`;
+
+export async function POST(request: NextRequest) {
+  try {
+    const { message, sessionId, userId, context } = await request.json();
+
+    if (!message) {
+      return NextResponse.json({ error: 'Message required' }, { status: 400 });
+    }
+
+    // Check user's subscription for rate limiting
+    if (userId) {
+      const { data: sub } = await supabase
+        .from('bv_subscriptions')
+        .select('plan')
+        .eq('user_id', userId)
+        .single();
+
+      const plan = sub?.plan || 'free';
+      
+      // Count messages this month
+      const startOfMonth = new Date();
+      startOfMonth.setDate(1);
+      startOfMonth.setHours(0, 0, 0, 0);
+
+      const { count } = await supabase
+        .from('bv_ai_conversations')
+        .select('id', { count: 'exact' })
+        .eq('user_id', userId)
+        .eq('role', 'user')
+        .gte('created_at', startOfMonth.toISOString());
+
+      const limits: Record<string, number> = {
+        free: 5,
+        collector: 10,
+        connoisseur: 50,
+        sommelier: Infinity,
+      };
+
+      if ((count || 0) >= limits[plan]) {
+        return NextResponse.json({
+          error: 'Monthly limit reached',
+          upgrade: true,
+          message: `You've reached your ${limits[plan]} AI chat limit for this month. Upgrade to continue chatting!`
+        }, { status: 429 });
+      }
+    }
+
+    // Get conversation history if sessionId provided
+    let conversationHistory: any[] = [];
+    if (sessionId) {
+      const { data: history } = await supabase
+        .from('bv_ai_conversations')
+        .select('role, content')
+        .eq('session_id', sessionId)
+        .order('created_at', { ascending: true })
+        .limit(20);
+
+      if (history) {
+        conversationHistory = history.map(h => ({
+          role: h.role as 'user' | 'assistant',
+          content: h.content,
+        }));
+      }
+    }
+
+    // Add context about user's collection if available
+    let enhancedSystemPrompt = SYSTEM_PROMPT;
+    if (context?.collection) {
+      enhancedSystemPrompt += `\n\nThe user's collection includes: ${context.collection.join(', ')}. Use this to personalize recommendations.`;
+    }
+    if (context?.preferences) {
+      enhancedSystemPrompt += `\n\nUser preferences: ${context.preferences}`;
+    }
+
+    // Call Claude
+    const response = await anthropic.messages.create({
+      model: 'claude-sonnet-4-20250514',
+      max_tokens: 1024,
+      system: enhancedSystemPrompt,
+      messages: [
+        ...conversationHistory,
+        { role: 'user', content: message },
+      ],
+    });
+
+    const assistantMessage = response.content[0].type === 'text' 
+      ? response.content[0].text 
+      : '';
+
+    // Save conversation
+    const newSessionId = sessionId || crypto.randomUUID();
+    
+    if (userId) {
+      await supabase.from('bv_ai_conversations').insert([
+        {
+          user_id: userId,
+          session_id: newSessionId,
+          role: 'user',
+          content: message,
+          tokens_used: response.usage?.input_tokens,
+        },
+        {
+          user_id: userId,
+          session_id: newSessionId,
+          role: 'assistant',
+          content: assistantMessage,
+          tokens_used: response.usage?.output_tokens,
+        },
+      ]);
+    }
+
+    return NextResponse.json({
+      message: assistantMessage,
+      sessionId: newSessionId,
+      tokensUsed: response.usage?.input_tokens + response.usage?.output_tokens,
+    });
+  } catch (error: any) {
+    console.error('AI Sommelier error:', error);
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+}
