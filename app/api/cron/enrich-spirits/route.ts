@@ -117,13 +117,13 @@ export async function GET(request: NextRequest) {
       job_name: 'enrich_spirits',
       status: 'error',
       results,
-      error: error.message,
+      error: 'The request could not be completed.', code: 'INTERNAL_ERROR',
       run_at: new Date().toISOString(),
     });
     
     return NextResponse.json({
       success: false,
-      error: error.message,
+      error: 'The request could not be completed.', code: 'INTERNAL_ERROR',
       data: results,
     }, { status: 500 });
   }
