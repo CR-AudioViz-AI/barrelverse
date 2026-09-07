@@ -44,7 +44,7 @@ export async function GET() {
       
     } catch (error: any) {
       console.error('Batch error:', error.message);
-      results.push({ error: error.message });
+      results.push({ error: 'The request could not be completed.', code: 'INTERNAL_ERROR' });
       break;
     }
   }
