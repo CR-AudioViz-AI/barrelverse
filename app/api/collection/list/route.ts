@@ -44,7 +44,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       .eq('is_finished', false)
       .order('name')
     if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500, headers: NO_STORE_HEADERS })
+      return NextResponse.json({ error: 'The request could not be completed.', code: 'INTERNAL_ERROR' }, { status: 500, headers: NO_STORE_HEADERS })
     }
 
     const cards = toCards((data ?? []) as unknown as BottleRow[])
