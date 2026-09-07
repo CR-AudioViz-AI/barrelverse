@@ -23,7 +23,7 @@ export async function GET(request: NextRequest) {
     const { data: questions, error } = await query.limit(count * 3);
 
     if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 });
+      return NextResponse.json({ error: 'The request could not be completed.', code: 'INTERNAL_ERROR' }, { status: 500 });
     }
 
     const shuffled = questions?.sort(() => Math.random() - 0.5).slice(0, count) || [];
