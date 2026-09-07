@@ -8,7 +8,36 @@ const API_URL = process.env.VERCEL_URL
   ? `https://${process.env.VERCEL_URL}/api/images/process`
   : 'http://localhost:3000/api/images/process';
 
-export async function GET() {
+
+/**
+ * 2026-09-07: a cron route anyone could trigger.
+ *
+ * Vercel sends CRON_SECRET as a bearer token on scheduled invocations. Without
+ * checking it, this endpoint processes images in batches of 100 for anybody who
+ * requests it - and it is declared maxDuration 300, so each call holds a
+ * function for five minutes.
+ */
+function requireCron(request: Request): Response | null {
+  const secret = process.env.CRON_SECRET ?? '';
+  if (!secret) {
+    return new Response(
+      JSON.stringify({ error: 'Not configured.', code: 'NOT_CONFIGURED' }),
+      { status: 503, headers: { 'content-type': 'application/json' } },
+    );
+  }
+  if (request.headers.get('authorization') !== `Bearer ${secret}`) {
+    return new Response(
+      JSON.stringify({ error: 'Forbidden', code: 'CRON_ONLY' }),
+      { status: 403, headers: { 'content-type': 'application/json' } },
+    );
+  }
+  return null;
+}
+
+export async function GET(request: Request) {
+  const denied = requireCron(request);
+  if (denied) return denied;
+
   const startTime = Date.now();
   const results: any[] = [];
   let offset = 0;
