@@ -39,7 +39,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     .order('acquired')
     .order('priority', { ascending: false })
     .order('created_at', { ascending: false })
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  if (error) return NextResponse.json({ error: 'The request could not be completed.', code: 'INTERNAL_ERROR' }, { status: 500 })
 
   const rows = data ?? []
   return NextResponse.json({
@@ -85,7 +85,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     priority: Math.max(1, Math.min(5, b.priority ?? 3)),
     notes: b.notes ?? null,
   }).select('id').single()
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  if (error) return NextResponse.json({ error: 'The request could not be completed.', code: 'INTERNAL_ERROR' }, { status: 500 })
   return NextResponse.json({ ok: true, id: data?.id, message: 'Added to your hunt list.' })
 }
 
@@ -146,6 +146,6 @@ export async function DELETE(request: NextRequest): Promise<NextResponse> {
   if (!_c.ok) return _c.res;
   const userId = _c.userId;if (!id || !userId) return NextResponse.json({ error: 'id and userId are required' }, { status: 400 })
   const { error } = await db().from('collector_wishlists').delete().eq('id', id).eq('user_id', userId)
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  if (error) return NextResponse.json({ error: 'The request could not be completed.', code: 'INTERNAL_ERROR' }, { status: 500 })
   return NextResponse.json({ ok: true, message: 'Removed.' })
 }
