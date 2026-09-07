@@ -226,7 +226,7 @@ export async function GET(request: NextRequest) {
     
   } catch (error: any) {
     console.error('Search API error:', error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ error: 'The request could not be completed.', code: 'INTERNAL_ERROR' }, { status: 500 });
   }
 }
 
@@ -341,6 +341,6 @@ export async function POST(request: NextRequest) {
     
   } catch (error: any) {
     console.error('Autocomplete error:', error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ error: 'The request could not be completed.', code: 'INTERNAL_ERROR' }, { status: 500 });
   }
 }
