@@ -36,7 +36,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
   if (q) query = query.ilike('name', `%${q}%`)
 
   const { data, error } = await query
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  if (error) return NextResponse.json({ error: 'The request could not be completed.', code: 'INTERNAL_ERROR' }, { status: 500 })
   return NextResponse.json({ trades: data ?? [], scope: mine ? 'mine' : 'board' })
 }
 
@@ -95,7 +95,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     notes: b.notes ?? null,
     status: 'open',
   }).select('id').single()
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  if (error) return NextResponse.json({ error: 'The request could not be completed.', code: 'INTERNAL_ERROR' }, { status: 500 })
 
   return NextResponse.json({
     ok: true, id: data?.id,
@@ -122,7 +122,7 @@ export async function PATCH(request: NextRequest): Promise<NextResponse> {
   const { error } = await db().from('bottle_trades')
     .update({ status: b.status, updated_at: new Date().toISOString() })
     .eq('id', b.id).eq('owner_id', _c.userId)
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  if (error) return NextResponse.json({ error: 'The request could not be completed.', code: 'INTERNAL_ERROR' }, { status: 500 })
   return NextResponse.json({
     ok: true, status: b.status,
     message: b.status === 'closed'
