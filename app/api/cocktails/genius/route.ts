@@ -115,7 +115,7 @@ export async function GET(request: NextRequest) {
     
   } catch (error: any) {
     console.error('Cocktail genius error:', error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ error: 'The request could not be completed.', code: 'INTERNAL_ERROR' }, { status: 500 });
   }
 }
 
@@ -217,7 +217,7 @@ Respond ONLY with valid JSON array:
     
   } catch (error: any) {
     console.error('AI cocktail error:', error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ error: 'The request could not be completed.', code: 'INTERNAL_ERROR' }, { status: 500 });
   }
 }
 
