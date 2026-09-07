@@ -97,7 +97,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       rating: b.rating ?? null,
       status: 'open',
     }).select('id').single()
-    if (error) return NextResponse.json({ error: error.message }, { status: 500, headers: NO_STORE_HEADERS })
+    if (error) return NextResponse.json({ error: 'The request could not be completed.', code: 'INTERNAL_ERROR' }, { status: 500, headers: NO_STORE_HEADERS })
     return NextResponse.json({
       ok: true, action: 'added-open', bottleId: data?.id,
       message: `Added as an open bottle at ${Math.round(b.fillLevel ?? 100)}%.`,
@@ -127,7 +127,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     const { error } = await supa.from('user_bottles')
       .update({ quantity: (match.quantity as number) + qty, updated_at: new Date().toISOString() })
       .eq('id', match.id)
-    if (error) return NextResponse.json({ error: error.message }, { status: 500, headers: NO_STORE_HEADERS })
+    if (error) return NextResponse.json({ error: 'The request could not be completed.', code: 'INTERNAL_ERROR' }, { status: 500, headers: NO_STORE_HEADERS })
     return NextResponse.json({
       ok: true, action: 'stacked', bottleId: match.id,
       quantity: (match.quantity as number) + qty,
@@ -157,7 +157,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     rating: b.rating ?? null,
     status: 'sealed',
   }).select('id').single()
-  if (error) return NextResponse.json({ error: error.message }, { status: 500, headers: NO_STORE_HEADERS })
+  if (error) return NextResponse.json({ error: 'The request could not be completed.', code: 'INTERNAL_ERROR' }, { status: 500, headers: NO_STORE_HEADERS })
 
   return NextResponse.json({
     ok: true, action: 'created', bottleId: data?.id, quantity: qty,
