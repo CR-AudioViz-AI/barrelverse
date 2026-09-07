@@ -398,7 +398,44 @@ async function findBestImage(
 // ============================================================
 
 // GET: Get scraper status and stats
+
+/**
+ * 2026-09-07: this route had NO authentication of any kind.
+ *
+ * It sits under /api/admin and rewrites the spirits catalogue - importing,
+ * scraping and overwriting images across 1.5 million rows. Anyone who found the
+ * path could run it, repeatedly, and each run costs money and changes data.
+ *
+ * The check that found it called it "anonymous, costly and unlimited" and
+ * suggested a rate limit. A rate limit on an unauthenticated admin endpoint
+ * makes it slower to abuse, not harder. The defect was the missing gate.
+ */
+function requireAdmin(request: Request): Response | null {
+  const secret = process.env.ADMIN_API_SECRET ?? '';
+  if (!secret) {
+    // No fallback to a literal. An unset secret refuses rather than opens.
+    return new Response(
+      JSON.stringify({ error: 'Not configured.', code: 'NOT_CONFIGURED' }),
+      { status: 503, headers: { 'content-type': 'application/json' } },
+    );
+  }
+  const given = request.headers.get('x-admin-secret') ?? '';
+  const a = Buffer.from(given);
+  const b = Buffer.from(secret);
+  const ok = a.length === b.length && require('node:crypto').timingSafeEqual(a, b);
+  if (!ok) {
+    return new Response(
+      JSON.stringify({ error: 'Forbidden', code: 'ADMIN_ONLY' }),
+      { status: 403, headers: { 'content-type': 'application/json' } },
+    );
+  }
+  return null;
+}
+
 export async function GET(request: NextRequest) {
+  const denied = requireAdmin(request);
+  if (denied) return denied;
+
   if (!validateAdminKey(request)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
