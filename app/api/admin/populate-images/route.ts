@@ -107,7 +107,7 @@ export async function POST(request: NextRequest) {
       .is('primary_image_id', null)
       .limit(limit);
       
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    if (error) return NextResponse.json({ error: 'The request could not be completed.', code: 'INTERNAL_ERROR' }, { status: 500 });
 
     const results = { processed: 0, imagesFound: 0, imagesSaved: 0, spiritsWithImages: 0, errors: [] as string[] };
 
