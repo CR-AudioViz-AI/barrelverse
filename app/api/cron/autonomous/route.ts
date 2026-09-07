@@ -114,7 +114,7 @@ async function runHealthCheck() {
       check_name: 'Supabase Connection',
       status: error ? 'unhealthy' : 'healthy',
       response_time_ms: Date.now() - dbStart,
-      details: error ? { error: error.message } : { connected: true }
+      details: error ? { error: 'The request could not be completed.', code: 'INTERNAL_ERROR' } : { connected: true }
     })
   } catch (e) {
     checks.push({
