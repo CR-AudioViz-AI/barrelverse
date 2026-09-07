@@ -120,7 +120,7 @@ export async function GET(request: NextRequest) {
 
   } catch (error: any) {
     return NextResponse.json(
-      { success: false, error: error.message, partial: results },
+      { success: false, error: 'The request could not be completed.', code: 'INTERNAL_ERROR', partial: results },
       { status: 500 }
     );
   }
