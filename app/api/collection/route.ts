@@ -1,3 +1,4 @@
+import { callerId, unauthorised } from '@/lib/api/caller';
 // app/api/collection/route.ts — redirects to the working collection API
 //
 // This route queried spirit_collection, a table that DOES NOT EXIST. Every call
@@ -18,7 +19,9 @@ export const runtime = 'nodejs'
 export async function GET(request: NextRequest): Promise<NextResponse> {
   // Accept the old parameter name as well as the new one, so an existing caller
   // keeps working rather than being punished for our rename.
-  const userId = request.nextUrl.searchParams.get('user_id')
+  const userId = await callerId(request);
+  if (!userId) return unauthorised();
+  const _ignoredUserIdFromQuery = request.nextUrl.searchParams.get('user_id')
     ?? request.nextUrl.searchParams.get('userId')
   const url = new URL('/api/collection/list', request.nextUrl.origin)
   if (userId) url.searchParams.set('userId', userId)
