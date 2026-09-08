@@ -3,6 +3,13 @@ import { lazyAdminDb } from '@/lib/supabase/admin';
 const supabase = lazyAdminDb();
 
 export async function GET(request: NextRequest) {
+  // @auth-reviewed: click attribution for anonymous visitors.
+  //
+  // A click happens before anybody signs in, so this cannot require a session.
+  // It writes bv_affiliate_clicks, and anything the caller supplies about WHO
+  // clicked is untrustworthy by nature - the value is the aggregate, not the
+  // attribution of any single click.
+
   const searchParams = request.nextUrl.searchParams;
   const partner = searchParams.get('partner');
   const redirect = searchParams.get('redirect');
