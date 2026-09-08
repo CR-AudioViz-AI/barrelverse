@@ -1,3 +1,4 @@
+import { readBody } from '@/lib/api/body';
 /**
  * ADVANCED SPIRITS SEARCH API
  * ===========================
@@ -277,7 +278,9 @@ async function getFacets(): Promise<Facets> {
 
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json();
+    const parsed = await readBody<Record<string, unknown>>(request);
+    if (!parsed.ok) return parsed.response;
+    const body = parsed.body as any;
     const { query, limit = 10 } = body;
     
     if (!query || query.length < 2) {
