@@ -165,6 +165,19 @@ export async function GET(request: NextRequest) {
 // ============================================
 
 export async function POST(request: NextRequest) {
+  // @auth-reviewed: this handler writes nothing.
+  //
+  // It reads retailerId, spiritId, spiritName and userId from the body, logs
+  // them, and returns { success: true }. The comments in it say the quiet part -
+  // "In production, would log to database" and "Could also update
+  // bv_affiliate_clicks table here". Neither happens.
+  //
+  // The guard flags it because a userId arrives from the request, which is the
+  // right instinct: the moment somebody wires the insert this comment predicts,
+  // it becomes a real attribution forgery and the annotation must come off.
+  //
+  // Reviewed 2026-09-07. Verified by reading every line of the handler.
+
   try {
     const body = await request.json();
     const { retailerId, spiritId, spiritName, userId } = body;
