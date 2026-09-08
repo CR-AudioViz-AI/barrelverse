@@ -1,3 +1,4 @@
+import { rateLimit } from '@/lib/api/rate-limit';
 // app/api/auth/sso/consume/route.ts — spend the handoff code, on this domain
 //
 // STEP 4b OF THE HANDOFF, ON THE BRANDED SITE. The browser hands this route the
@@ -29,6 +30,9 @@ const NO_STORE = {
 } as const;
 
 export async function POST(req: NextRequest): Promise<NextResponse> {
+  const limited = rateLimit(req);
+  if (limited) return limited;
+
   let body: { code?: string };
   try {
     body = (await req.json()) as typeof body;
