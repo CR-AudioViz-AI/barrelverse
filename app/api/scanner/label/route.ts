@@ -1,3 +1,4 @@
+import { rateLimit } from '@/lib/api/rate-limit';
 // app/api/scanner/label/route.ts
 // AI-powered label reading using Vision API
 
@@ -18,6 +19,9 @@ function getOpenAI(): OpenAI {
 const supabase = lazyAdminDb()
 
 export async function POST(request: NextRequest) {
+  const limited = rateLimit(request);
+  if (limited) return limited;
+
   try {
     const { image } = await request.json() // base64 image
 
