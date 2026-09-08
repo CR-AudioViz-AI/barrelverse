@@ -19,6 +19,17 @@ interface BarcodeResult {
 }
 
 export async function GET(request: NextRequest) {
+  // @auth-reviewed: public by design, bounded by a rate limit.
+  //
+  // Scanning a barcode has to work before somebody has an account - that is the
+  // product. It inserts into bv_spirits when the barcode is unknown, so it is a
+  // write path a stranger can reach, and the protection is twenty requests a
+  // minute per address rather than a login.
+  //
+  // A rate limit is NOT authentication. It bounds abuse; it does not establish
+  // who is asking. That is the correct trade here and it is worth naming rather
+  // than letting the annotation imply the route is safe in every sense.
+
   const limited = rateLimit(request);
   if (limited) return limited;
 
