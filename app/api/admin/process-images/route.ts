@@ -1,3 +1,4 @@
+import { readBody, boundedInt } from '@/lib/api/body';
 import { NextRequest, NextResponse } from 'next/server';
 import { lazyAdminDb } from '@/lib/supabase/admin';
 import { secretKey, supabaseUrl } from "@craudioviz/platform-sdk";
@@ -111,7 +112,16 @@ export async function POST(request: NextRequest) {
   if (denied) return denied;
 
   try {
-    const { batchSize = 50, offset = 0 } = await request.json();
+    const parsed = await readBody<Record<string, unknown>>(request);
+    if (!parsed.ok) return parsed.response;
+
+    // 2026-09-07: batchSize and offset came straight from the body with only a
+    // default. A default is not a bound - the caller can send any number, and
+    // batchSize 1000000 is a valid number and an unavailable service. This route
+    // processes images, so each unit is real work against a 1.5 million row
+    // table.
+    const batchSize = boundedInt(parsed.body.batchSize, { fallback: 50, min: 1, max: 200 });
+    const offset = boundedInt(parsed.body.offset, { fallback: 0, min: 0, max: 5_000_000 });
     
     // Ensure bucket exists
     const { data: buckets } = await supabase.storage.listBuckets();
