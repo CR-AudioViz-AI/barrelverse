@@ -281,7 +281,7 @@ CREATE INDEX idx_system_logs_time ON bv_system_logs(timestamp DESC);
 -- =====================================================
 -- HEALTH CHECKS
 -- =====================================================
-CREATE TABLE IF NOT EXISTS bv_health_checks (
+CREATE TABLE IF NOT EXISTS health_checkss (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     healthy BOOLEAN NOT NULL,
     issues TEXT[] DEFAULT '{}',
@@ -289,7 +289,7 @@ CREATE TABLE IF NOT EXISTS bv_health_checks (
     timestamp TIMESTAMPTZ DEFAULT NOW()
 );
 
-CREATE INDEX idx_health_checks_time ON bv_health_checks(timestamp DESC);
+CREATE INDEX idx_health_checks_time ON health_checkss(timestamp DESC);
 
 -- =====================================================
 -- COURSES & LESSONS (for auto-generation)
