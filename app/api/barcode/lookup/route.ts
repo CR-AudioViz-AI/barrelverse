@@ -1,3 +1,4 @@
+import { rateLimit } from '@/lib/api/rate-limit';
 // app/api/barcode/lookup/route.ts — Javari Spirits barcode lookup
 //
 // This app used to carry 38 hardcoded UPCs in a constant. That is not a
@@ -50,6 +51,9 @@ interface IdentifyResult {
 }
 
 export async function GET(request: NextRequest): Promise<NextResponse> {
+  const limited = rateLimit(request);
+  if (limited) return limited;
+
   const code = request.nextUrl.searchParams.get('barcode') ?? request.nextUrl.searchParams.get('code')
   // The scan page sends 'query'; other callers send 'q'. Accepting only one
   // would fail silently as a miss rather than an error, which is the worst kind
