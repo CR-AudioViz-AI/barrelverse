@@ -1,3 +1,4 @@
+import { readBody } from '@/lib/api/body';
 /**
  * SPIRIT DATA IMPORT API
  * =======================
@@ -74,7 +75,9 @@ export async function POST(request: NextRequest) {
       // For demo, allow import without auth
     }
 
-    const body = await request.json();
+    const parsed = await readBody<Record<string, unknown>>(request);
+    if (!parsed.ok) return parsed.response;
+    const body = parsed.body as any;
     const spiritsToImport = body.spirits || SAMPLE_SPIRITS;
 
     let imported = 0;
