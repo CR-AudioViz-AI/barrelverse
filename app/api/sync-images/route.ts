@@ -1,3 +1,4 @@
+import { rateLimit } from '@/lib/api/rate-limit';
 import { NextRequest, NextResponse } from 'next/server';
 import { lazyAdminDb } from '@/lib/supabase/admin';
 import { secretKey, supabaseUrl } from "@craudioviz/platform-sdk";
@@ -71,6 +72,9 @@ async function downloadAndUpload(imageUrl: string, spiritId: string): Promise<st
 }
 
 export async function POST(request: NextRequest) {
+  const limited = rateLimit(request);
+  if (limited) return limited;
+
   try {
     const body = await request.json();
     const batch = body.batch || 0;
