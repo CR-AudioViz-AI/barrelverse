@@ -1,3 +1,4 @@
+import { rateLimit } from '@/lib/api/rate-limit';
 // app/api/external/route.ts
 // FREE API INTEGRATIONS FOR MAXIMUM DATA ENRICHMENT
 // Connected APIs: Open Food Facts, UPCitemdb, CocktailDB, PunkAPI, OpenBreweryDB, WikiData
@@ -58,6 +59,9 @@ const FREE_APIS = {
 };
 
 export async function GET(request: NextRequest) {
+  const limited = rateLimit(request);
+  if (limited) return limited;
+
   const { searchParams } = new URL(request.url);
   const source = searchParams.get("source");
   const action = searchParams.get("action");
