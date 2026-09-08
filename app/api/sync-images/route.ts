@@ -1,3 +1,4 @@
+import { readBody } from '@/lib/api/body';
 import { rateLimit } from '@/lib/api/rate-limit';
 import { NextRequest, NextResponse } from 'next/server';
 import { lazyAdminDb } from '@/lib/supabase/admin';
@@ -76,7 +77,9 @@ export async function POST(request: NextRequest) {
   if (limited) return limited;
 
   try {
-    const body = await request.json();
+    const parsed = await readBody<Record<string, unknown>>(request);
+    if (!parsed.ok) return parsed.response;
+    const body = parsed.body as any;
     const batch = body.batch || 0;
     const batchSize = body.batchSize || 50;
     
