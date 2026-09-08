@@ -27,6 +27,15 @@ const supabase = lazyAdminDb();
 // ============================================
 
 export async function POST(request: NextRequest) {
+  // @auth-reviewed: a payment provider webhook, verified by signature.
+  //
+  // This MUST accept unauthenticated POSTs - the provider has no session with us.
+  // It verifies the signature instead, which is the correct control for a
+  // webhook and stronger than a login would be.
+  //
+  // Deliberately NOT rate limited: throttling a webhook drops legitimate retries
+  // during exactly the incident when they matter most.
+
   try {
     const body = await request.text();
     const signature = request.headers.get('stripe-signature');
