@@ -1,3 +1,4 @@
+import { readBody } from '@/lib/api/body';
 import { NextRequest, NextResponse } from 'next/server';
 import { lazyAdminDb } from '@/lib/supabase/admin';
 // Admin route for database operations - protected by CRON_SECRET
@@ -12,7 +13,9 @@ export async function POST(request: NextRequest) {
   const supabaseAdmin = lazyAdminDb();
 
   try {
-    const body = await request.json();
+    const parsed = await readBody<Record<string, unknown>>(request);
+    if (!parsed.ok) return parsed.response;
+    const body = parsed.body as any;
     const { action, table, data, query } = body;
 
     switch (action) {
