@@ -41,7 +41,26 @@ interface ScheduledContentInput {
 const supabase = lazyAdminDb()
 
 // GET - List scheduled content
+
+function requireAdmin(request: Request): Response | null {
+  const secret = process.env.ADMIN_API_SECRET ?? '';
+  if (!secret) {
+    // An unset secret refuses rather than opens. No literal fallback.
+    return new Response(JSON.stringify({ error: 'Not configured.', code: 'NOT_CONFIGURED' }),
+      { status: 503, headers: { 'content-type': 'application/json' } });
+  }
+  const given = request.headers.get('x-admin-secret') ?? '';
+  const a = Buffer.from(given);
+  const b = Buffer.from(secret);
+  const ok = a.length === b.length && require('node:crypto').timingSafeEqual(a, b);
+  return ok ? null : new Response(JSON.stringify({ error: 'Forbidden', code: 'ADMIN_ONLY' }),
+    { status: 403, headers: { 'content-type': 'application/json' } });
+}
+
 export async function GET(request: NextRequest) {
+  const denied = requireAdmin(request);
+  if (denied) return denied;
+
   const { searchParams } = new URL(request.url)
   const status = searchParams.get('status') || 'pending'
   const contentType = searchParams.get('content_type')
@@ -95,6 +114,9 @@ export async function GET(request: NextRequest) {
 
 // POST - Schedule new content action
 export async function POST(request: NextRequest) {
+  const denied = requireAdmin(request);
+  if (denied) return denied;
+
   try {
     const body: ScheduledContentInput = await request.json()
     
@@ -139,6 +161,9 @@ export async function POST(request: NextRequest) {
 
 // PATCH - Update scheduled content or execute immediately
 export async function PATCH(request: NextRequest) {
+  const denied = requireAdmin(request);
+  if (denied) return denied;
+
   try {
     const body = await request.json()
     const { id, action } = body
@@ -205,6 +230,9 @@ export async function PATCH(request: NextRequest) {
 
 // DELETE - Cancel scheduled content
 export async function DELETE(request: NextRequest) {
+  const denied = requireAdmin(request);
+  if (denied) return denied;
+
   const { searchParams } = new URL(request.url)
   const id = searchParams.get('id')
 
