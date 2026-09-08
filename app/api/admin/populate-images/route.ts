@@ -1,3 +1,4 @@
+import { readBody } from '@/lib/api/body';
 import { NextRequest, NextResponse } from 'next/server';
 import { lazyAdminDb } from '@/lib/supabase/admin';
 import { secretKey, supabaseUrl } from "@craudioviz/platform-sdk";
@@ -135,7 +136,9 @@ export async function POST(request: NextRequest) {
   if (denied) return denied;
 
   try {
-    const body = await request.json().catch(() => ({}));
+    const parsed = await readBody<Record<string, unknown>>(request);
+    if (!parsed.ok) return parsed.response;
+    const body = parsed.body as any;.catch(() => ({}));
     const limit = Math.min(body.limit || 30, 50);
 
     const { data: spirits, error } = await supabase
