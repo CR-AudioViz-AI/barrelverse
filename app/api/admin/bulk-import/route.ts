@@ -1,3 +1,4 @@
+import { readBody } from '@/lib/api/body';
 /**
  * COMPREHENSIVE SPIRIT DATABASE IMPORT
  * =====================================
@@ -132,7 +133,9 @@ const SPIRITS_DATABASE = [
 
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json().catch(() => ({}));
+    const parsed = await readBody<Record<string, unknown>>(request);
+    if (!parsed.ok) return parsed.response;
+    const body = parsed.body as any;.catch(() => ({}));
     const spiritsToImport = body.spirits || SPIRITS_DATABASE;
 
     let imported = 0;
