@@ -1,3 +1,4 @@
+import { readBody } from '@/lib/api/body';
 /**
  * AUTO-TICKETS API
  * ================
@@ -83,9 +84,9 @@ export async function GET(request: NextRequest) {
 // POST - Create auto ticket (from error handler or system)
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json()
-    
-    const ticket = {
+    const parsed = await readBody<Record<string, unknown>>(request);
+    if (!parsed.ok) return parsed.response;
+    const body = parsed.body as any;const ticket = {
       ticket_type: body.ticket_type || 'error',
       title: body.title,
       description: body.description,
