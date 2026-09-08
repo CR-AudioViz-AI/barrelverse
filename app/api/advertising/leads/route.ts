@@ -3,6 +3,11 @@ import { lazyAdminDb } from '@/lib/supabase/admin';
 const supabase = lazyAdminDb();
 
 export async function POST(request: NextRequest) {
+  // @auth-reviewed: a public lead form.
+  //
+  // Somebody submitting an enquiry does not have an account yet - that is the
+  // entire point of a lead. Writes bv_advertising_leads only.
+
   try {
     const body = await request.json();
     
