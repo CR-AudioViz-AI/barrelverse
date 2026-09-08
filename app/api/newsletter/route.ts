@@ -35,6 +35,16 @@ function generateToken(): string {
 // ============================================
 
 export async function POST(request: NextRequest) {
+  // @auth-reviewed: public signup, bounded by a rate limit.
+  //
+  // Subscribing cannot require an account. Rate limited to twenty a minute.
+  //
+  // WORTH KNOWING: this also writes bv_xp_log and updates bv_profiles, so it
+  // awards experience points. The rate limit bounds how fast somebody could farm
+  // them but does not stop it entirely. That is a product decision - whether
+  // signing up should grant XP at all - not a security hole, and it is recorded
+  // here so the next person meets the question rather than the symptom.
+
   const limited = rateLimit(request);
   if (limited) return limited;
 
