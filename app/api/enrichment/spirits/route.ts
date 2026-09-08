@@ -1,3 +1,4 @@
+import { rateLimit } from '@/lib/api/rate-limit';
 // 2026-09-04: table names corrected against the live schema. These are renames
 // the code never caught up with - bv_user_profiles and bv_users are both
 // bv_profiles, bv_activity_log is bv_activities, bv_tickets is
@@ -35,6 +36,9 @@ export const maxDuration = 300; // 5 minutes max for Vercel
 // ============================================
 
 export async function GET(request: NextRequest) {
+  const limited = rateLimit(request);
+  if (limited) return limited;
+
   try {
     const { searchParams } = new URL(request.url);
     const action = searchParams.get('action') || 'status';
