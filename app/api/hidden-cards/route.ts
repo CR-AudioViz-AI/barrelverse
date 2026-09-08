@@ -1,3 +1,4 @@
+import { callerId, unauthorised } from '@/lib/api/caller';
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabaseClient } from '@/lib/supabase/server';
 
@@ -20,7 +21,9 @@ interface HiddenCard {
 // Hidden card discovery endpoint
 export async function POST(request: NextRequest) {
   try {
-    const { cardId, location, userId } = await request.json();
+    const { cardId, location } = await request.json();
+    const userId = await callerId(request);
+    if (!userId) return unauthorised();
 
     if (!cardId || !userId) {
       return NextResponse.json(
@@ -152,7 +155,8 @@ export async function POST(request: NextRequest) {
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
-    const userId = searchParams.get('userId');
+    const userId = await callerId(request);
+    if (!userId) return unauthorised();
 
     if (!userId) {
       return NextResponse.json(
