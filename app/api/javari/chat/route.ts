@@ -1,3 +1,4 @@
+import { readBody } from '@/lib/api/body';
 // 2026-09-04: table names corrected against the live schema. These are renames
 // the code never caught up with - bv_user_profiles and bv_users are both
 // bv_profiles, bv_activity_log is bv_activities, bv_tickets is
@@ -73,7 +74,9 @@ Context about BarrelVerse:
 
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json();
+    const parsed = await readBody<Record<string, unknown>>(request);
+    if (!parsed.ok) return parsed.response;
+    const body = parsed.body as any;
     // user id deliberately not taken from the body.
     const {message, context,  history} = body;
     const _c = await requireCaller(request);
