@@ -1,3 +1,4 @@
+import { rateLimit } from '@/lib/api/rate-limit';
 /**
  * NEWSLETTER SUBSCRIPTION API
  * ===========================
@@ -34,6 +35,9 @@ function generateToken(): string {
 // ============================================
 
 export async function POST(request: NextRequest) {
+  const limited = rateLimit(request);
+  if (limited) return limited;
+
   try {
     const body = await request.json();
     const { email, source = 'website', preferences = {}, user_id } = body;
