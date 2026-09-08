@@ -1,3 +1,4 @@
+import { rateLimit } from '@/lib/api/rate-limit';
 /**
  * COCKTAIL GENIUS API
  * ===================
@@ -19,6 +20,9 @@ export const dynamic = 'force-dynamic';
 // ============================================
 
 export async function GET(request: NextRequest) {
+  const limited = rateLimit(request);
+  if (limited) return limited;
+
   try {
     const { searchParams } = new URL(request.url);
     const ingredients = searchParams.get('ingredients')?.split(',').filter(Boolean) || [];
