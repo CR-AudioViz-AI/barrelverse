@@ -1,3 +1,4 @@
+import { readBody } from '@/lib/api/body';
 // ============================================================
 // BARRELVERSE - BATCH IMAGE PROCESSING API
 // Process all 22,951 spirits systematically
@@ -303,7 +304,9 @@ export async function POST(request: NextRequest) {
   const startTime = Date.now();
   
   try {
-    const body = await request.json();
+    const parsed = await readBody<Record<string, unknown>>(request);
+    if (!parsed.ok) return parsed.response;
+    const body = parsed.body as any;
     const {
       category,
       afterId,
