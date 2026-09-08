@@ -1,3 +1,4 @@
+import { rateLimit } from '@/lib/api/rate-limit';
 // app/api/random/route.ts
 // RANDOM SPIRIT & COCKTAIL RECOMMENDATION API
 // Returns random items for discovery features
@@ -7,6 +8,9 @@ import { lazyAdminDb } from '@/lib/supabase/admin';
 const supabase = lazyAdminDb();
 
 export async function GET(request: NextRequest) {
+  const limited = rateLimit(request);
+  if (limited) return limited;
+
   const { searchParams } = new URL(request.url);
   const type = searchParams.get("type") || "spirit";
   const count = Math.min(parseInt(searchParams.get("count") || "1"), 10);
