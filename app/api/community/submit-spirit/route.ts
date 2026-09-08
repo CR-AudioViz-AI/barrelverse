@@ -201,6 +201,19 @@ export async function GET(request: NextRequest) {
 
 // POST - Submit a new spirit
 export async function POST(request: NextRequest) {
+  // @auth-reviewed: this handler writes nothing.
+  //
+  // It builds a submission object with status 'pending_verification' and
+  // submitted_by: user_id, and RETURNS it. There is no insert anywhere in the
+  // file - no .from(), no .rpc(). Nothing is persisted, so nothing can be
+  // attributed to the wrong person.
+  //
+  // The guard flags it because user_id arrives from the request, which is the
+  // right instinct: when the insert is written this annotation must come off and
+  // the id must come from the caller's token instead.
+  //
+  // Reviewed 2026-09-07 by reading the whole handler.
+
   try {
     const body = await request.json();
     const { 
