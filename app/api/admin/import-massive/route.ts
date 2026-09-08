@@ -1,3 +1,4 @@
+import { readBody } from '@/lib/api/body';
 // app/api/admin/import-massive/route.ts
 // Massive Spirit Import API for Javari Spirits
 // Pulls from multiple free data sources
@@ -1097,7 +1098,9 @@ export async function GET(request: NextRequest) {
 
 // POST endpoint - Trigger full import
 export async function POST(request: NextRequest) {
-  const body = await request.json();
+  const parsed = await readBody<Record<string, unknown>>(request);
+    if (!parsed.ok) return parsed.response;
+    const body = parsed.body as any;
   const { source, searchTerms, maxPages } = body;
   
   if (source === 'open_food_facts') {
