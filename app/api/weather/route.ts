@@ -1,3 +1,4 @@
+import { rateLimit } from '@/lib/api/rate-limit';
 // app/api/weather/route.ts
 // WEATHER & TASTING CONDITIONS API
 // Free APIs: Open-Meteo (no API key needed), IP-API for geolocation
@@ -81,6 +82,9 @@ function getTastingConditions(weather: any): {
 }
 
 export async function GET(request: NextRequest) {
+  const limited = rateLimit(request);
+  if (limited) return limited;
+
   const { searchParams } = new URL(request.url);
   let lat = searchParams.get("lat");
   let lon = searchParams.get("lon");
