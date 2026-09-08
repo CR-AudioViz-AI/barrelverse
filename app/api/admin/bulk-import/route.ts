@@ -135,7 +135,7 @@ export async function POST(request: NextRequest) {
   try {
     const parsed = await readBody<Record<string, unknown>>(request);
     if (!parsed.ok) return parsed.response;
-    const body = parsed.body as any;.catch(() => ({}));
+    const body = parsed.body as any;
     const spiritsToImport = body.spirits || SPIRITS_DATABASE;
 
     let imported = 0;
