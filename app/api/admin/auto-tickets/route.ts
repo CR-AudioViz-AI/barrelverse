@@ -130,8 +130,9 @@ export async function POST(request: NextRequest) {
 // PATCH - Update ticket status
 export async function PATCH(request: NextRequest) {
   try {
-    const body = await request.json()
-    const { id, status, assigned_to } = body
+    const parsed = await readBody<Record<string, unknown>>(request, { require: ["title"] });
+  if (!parsed.ok) return parsed.response;
+  const body = parsed.body as any;const { id, status, assigned_to } = body
 
     const updates: Record<string, unknown> = {
       updated_at: new Date().toISOString()
