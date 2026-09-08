@@ -729,7 +729,7 @@ export async function systemHealthCheck(): Promise<{
 
   // Check database connectivity
   try {
-    await supabase.from('bv_health_check').select('id').limit(1);
+    await supabase.from('health_checks').select('id').limit(1);
   } catch {
     issues.push('Database connectivity issue');
   }
