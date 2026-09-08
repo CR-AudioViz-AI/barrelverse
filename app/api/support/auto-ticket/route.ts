@@ -1,3 +1,4 @@
+import { readBody } from '@/lib/api/body';
 // app/api/support/auto-ticket/route.ts
 // Auto-generates support tickets from client-side errors
 
@@ -20,7 +21,9 @@ interface ErrorTicketPayload {
 
 export async function POST(request: NextRequest) {
   try {
-    const payload: ErrorTicketPayload = await request.json();
+    const parsed = await readBody<Record<string, unknown>>(request, {});
+  if (!parsed.ok) return parsed.response;
+  const payload = parsed.body as ErrorTicketPayload;
 
     // Determine priority based on error type
     let priority = 'medium';
