@@ -30,6 +30,12 @@ const supabase = lazyAdminDb();
 const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET!;
 
 export async function POST(req: Request) {
+  // @auth-reviewed: a Stripe webhook, verified by signature.
+  //
+  // Must accept unauthenticated POSTs from Stripe, which has no session with us,
+  // and verifies the signature instead. Not rate limited, deliberately - dropping
+  // a retry during an incident is worse than the traffic.
+
   const body = await req.text();
   // 2026-09-01, Next 15: headers() is ASYNC.
   //
