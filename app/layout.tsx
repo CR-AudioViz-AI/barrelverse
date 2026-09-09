@@ -1,3 +1,5 @@
+import { ThemeProvider, BrandedHeader, BrandedFooter } from '@craudioviz/platform-sdk'
+import './globals.css'
 // app/layout.tsx — javari-spirits
 //
 // ONE header, ONE footer. This file used to render its own fixed bar and
@@ -47,6 +49,23 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           display: 'flex', flexDirection: 'column', minHeight: '100vh',
         }}
       >
+        {/* 2026-09-07: platform chrome from the SDK.
+            ThemeProvider is REQUIRED - BrandedHeader renders ThemeToggle, which
+            calls useTheme, which THROWS without a provider above it. A green
+            build and a 500 on every render. */}
+        <ThemeProvider>
+        <BrandedHeader
+          appName="Javari Spirits"
+          quickLinks={[
+            { label: 'All Apps', href: 'https://craudiovizai.com/apps' },
+            { label: 'Games', href: 'https://craudiovizai.com/games' },
+            { label: 'Tools', href: 'https://craudiovizai.com/tools' },
+            { label: 'Market', href: 'https://craudiovizai.com/market' },
+            { label: 'Pricing', href: 'https://craudiovizai.com/pricing' },
+            { label: 'Help', href: 'https://craudiovizai.com/help' },
+          ]}
+        />
+
         {/* 2026-09-10: WCAG 2.4.1. Without this a keyboard user traverses the
             entire navigation on every page before reaching anything. Visually
             hidden until focused, which is the point - it is for people who are
@@ -61,6 +80,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <SiteHeader />
         <main style={{ flex: 1 }}>{children}</main>
         <SiteFooter />
+        <BrandedFooter appName="Javari Spirits" />
+        </ThemeProvider>
       </body>
     </html>
   )
