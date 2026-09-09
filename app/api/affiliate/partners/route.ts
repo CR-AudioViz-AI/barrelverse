@@ -63,7 +63,35 @@ export async function GET(request: NextRequest) {
 }
 
 // Admin endpoint to add/update partners
+
+function requireAdmin(request: Request): Response | null {
+  const secret = process.env.ADMIN_API_SECRET ?? '';
+  if (!secret) {
+    return new Response(JSON.stringify({ error: 'Not configured.', code: 'NOT_CONFIGURED' }),
+      { status: 503, headers: { 'content-type': 'application/json' } });
+  }
+  const given = request.headers.get('x-admin-secret') ?? '';
+  const a = Buffer.from(given);
+  const b = Buffer.from(secret);
+  const ok = a.length === b.length && require('node:crypto').timingSafeEqual(a, b);
+  return ok ? null : new Response(JSON.stringify({ error: 'Forbidden', code: 'ADMIN_ONLY' }),
+    { status: 403, headers: { 'content-type': 'application/json' } });
+}
+
 export async function POST(request: NextRequest) {
+  // 2026-09-07: this let anybody register or OVERWRITE an affiliate partner.
+  //
+  // The upsert takes partner_slug and affiliate_url from the body. Upsert means
+  // a slug that already exists is replaced, so a stranger could point an
+  // existing partner's affiliate_url at their own link and take the commission
+  // on every click that follows - silently, because the partner still looks
+  // right in the list.
+  //
+  // The guard called this WARN rather than CRITICAL because no id is read from
+  // the request. The slug IS the id here.
+  const denied = requireAdmin(request);
+  if (denied) return denied;
+
   try {
     // Check for admin authorization
     const authHeader = request.headers.get('authorization');
