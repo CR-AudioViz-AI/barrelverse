@@ -13,6 +13,7 @@ import './globals.css'
 import type { Metadata } from 'next'
 import SiteHeader from '@/components/brand/SiteHeader'
 import SiteFooter from '@/components/brand/SiteFooter'
+import { EmbedBridge, EMBED_PREPAINT_SCRIPT } from '@craudioviz/platform-sdk'
 
 export const dynamic = 'force-dynamic'
 
@@ -44,6 +45,10 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en">
+      <head>
+        {/* factory 2026-09-10: marks an embedded page before first paint */}
+        <script dangerouslySetInnerHTML={{ __html: EMBED_PREPAINT_SCRIPT }} />
+      </head>
       <body
         style={{
           margin: 0, padding: 0, background: '#0D0E11', color: '#F2EDE4',
@@ -51,6 +56,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           display: 'flex', flexDirection: 'column', minHeight: '100vh',
         }}
       >
+        <EmbedBridge />
         {/* 2026-09-10: WCAG 2.4.1. Without this a keyboard user traverses the
             entire navigation on every page before reaching anything. Visually
             hidden until focused, which is the point - it is for people who are
@@ -62,9 +68,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           Skip to main content
         </a>
 
-        <SiteHeader />
+        <div data-app-chrome style={{ display: 'contents' }}><SiteHeader /></div>
         <main style={{ flex: 1 }}>{children}</main>
-        <SiteFooter />
+        <div data-app-chrome style={{ display: 'contents' }}><SiteFooter /></div>
       </body>
     </html>
   )
